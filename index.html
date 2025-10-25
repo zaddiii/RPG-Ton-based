@@ -7,34 +7,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TON Connect Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana Wallet Connect Test</title>
 </head>
 <body style="text-align:center;padding-top:50px;font-family:sans-serif;">
+  <h1>Solana Wallet Connect Test</h1>
 
-  <h1>TON Wallet Connect Test</h1>
-  
-  <!-- TonConnect button renders here -->
-  <div id="ton-connect"></div>
-  
+  <!-- Connect button -->
+  <button id="connectWalletBtn">Connect Wallet</button>
+
   <p>Wallet Address: <span id="walletAddress">not connected</span></p>
 
-  <!-- ES module for TonConnectUI -->
-  <script type="module">
-    import { TonConnectUI } from 'https://cdn.jsdelivr.net/npm/@tonconnect/ui@2.0.9/dist/tonconnect-ui.esm.min.js';
+  <script>
+    const connectBtn = document.getElementById('connectWalletBtn');
+    const walletEl = document.getElementById('walletAddress');
 
-    const tonConnectUI = new TonConnectUI({
-      manifestUrl: 'https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json',
-      buttonRootId: 'ton-connect'
-    });
+    async function connectWallet() {
+      if (window.solana && window.solana.isPhantom) {
+        try {
+          const response = await window.solana.connect();
+          walletEl.innerText = response.publicKey.toString();
+          connectBtn.disabled = true;
+          connectBtn.innerText = "Wallet Connected ✅";
+        } catch (err) {
+          console.error("Connection failed:", err);
+        }
+      } else {
+        alert("Phantom Wallet not found! Please install Phantom.");
+      }
+    }
 
-    tonConnectUI.render();
-
-    setInterval(() => {
-      const account = tonConnectUI.account;
-      document.getElementById('walletAddress').innerText = account?.address || 'not connected';
-    }, 1000);
+    connectBtn.addEventListener('click', connectWallet);
   </script>
-
 </body>
 </html>
