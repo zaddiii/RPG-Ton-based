@@ -1,0 +1,57 @@
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TON Wallet Connect Test</title>
+</head>
+<body style="font-family:sans-serif;text-align:center;padding-top:100px;">
+
+  <h1>TON Wallet Connection Test</h1>
+
+  <!-- The TonConnect button will appear here -->
+  <div id="ton-connect"></div>
+
+  <p>Wallet Address: <span id="walletAddress">not connected</span></p>
+
+  <!-- TonConnect UI Library -->
+  <script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
+
+  <script>
+    // Your local IP and new port
+    const localIP = '192.168.134.203';
+    const port = '8080';
+
+    // Create TonConnect UI instance with updated manifest URL
+    const tonConnectUI = new TonConnectUI({
+      manifestUrl: `http://${localIP}:${port}/tonconnect-manifest.json`,
+      buttonRootId: 'ton-connect'
+    });
+
+    // Force render the connect button immediately
+    tonConnectUI.render();
+
+    // Sync wallet status
+    async function syncWallet() {
+      try {
+        const account = tonConnectUI.account;
+        const walletEl = document.getElementById('walletAddress');
+        if (account && account.address) {
+          walletEl.innerText = account.address;
+        } else {
+          walletEl.innerText = 'not connected';
+        }
+      } catch (e) {
+        console.warn("Sync wallet error:", e);
+      }
+    }
+
+    // Check wallet every 1.5 seconds
+    setInterval(syncWallet, 1500);
+  </script>
+
+</body>
+</html>
