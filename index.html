@@ -1,6 +1,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,13 +22,9 @@
   <script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
 
   <script>
-    // Your local IP and new port
-    const localIP = '192.168.134.203';
-    const port = '8080';
-
-    // Create TonConnect UI instance with updated manifest URL
+    // Create TonConnect UI instance with GitHub Pages manifest URL
     const tonConnectUI = new TonConnectUI({
-      manifestUrl: `http://${localIP}:${port}/tonconnect-manifest.json`,
+      manifestUrl: 'https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json',
       buttonRootId: 'ton-connect'
     });
 
