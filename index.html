@@ -5,168 +5,153 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RPG Game Solana v1</title>
-  <style>
-    body {
-      background-color: burlywood;
-      font-family: "Times New Roman", serif;
-      color: black;
-      text-align: center;
-      transition: background-color 0.3s ease;
-    }
-    button {
-      border: none;
-      border-radius: 15px;
-      padding: 8px 15px;
-      margin: 5px;
-      background-color: white;
-      color: black;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    #gameArea { margin-top: 20px; display: none; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NFT RPG Game - Solana</title>
+<style>
+  body { background-color: burlywood; font-family: "Times New Roman", serif; color: black; text-align: center; transition: background-color 0.3s ease; }
+  #gameArea button, .startbutton { border: none; border-radius: 15px; padding: 8px 15px; margin: 5px; background-color: white; color: black; font-weight: bold; cursor: pointer; }
+  #gameArea { margin-top: 20px; display: none; }
+  #sidebar { position: fixed; right: 0; top: 0; width: 220px; background: #f5deb3; padding: 10px; border-left: 2px solid #000; height: 100%; text-align: left; }
+  .skill-animation { font-size: 50px; animation: fly 0.8s forwards; position: absolute; left: 50%; top: 50%; }
+  @keyframes fly { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; } }
+</style>
 </head>
 <body>
 
-  <h1>RPG Game (Solana)</h1>
-  <p>Wallet Address: <span id="walletAddress">not connected</span></p>
-  <button id="connectWalletBtn">Connect Phantom Wallet</button>
+<h1>NFT RPG Game - Solana</h1>
 
-  <div id="gameArea">
-    <p>Player Health: <span id="playerHealth">100</span></p>
-    <p>Player Mana: <span id="playerMana">30</span></p>
-    <p>Enemy Health: <span id="enemyHealth">100</span></p>
-    <p>Enemy Mana: <span id="enemyMana">30</span></p>
+<div id="sidebar">
+  <h3>Your NFT Character</h3>
+  <p>Character ID: <span id="charID">none</span></p>
+  <p>Skill: <span id="charSkill">none</span></p>
+</div>
 
-    <button onclick="playerAction('Attack')">Attack</button>
-    <button onclick="playerAction('Defend')">Defend</button>
-    <button onclick="playerAction('Special')">Special (-20 MP)</button>
-    <button onclick="playerAction('Heal')">Heal (+30 HP, -10 MP)</button>
-    <button onclick="resetGame(true)">Reset Game</button>
-  </div>
+<div id="gameArea">
+  <p>Player Health: <span id="playerHealth">100</span></p>
+  <p>Player Mana: <span id="playerMana">30</span></p>
+  <p>Enemy Health: <span id="enemyHealth">100</span></p>
+  <p>Enemy Mana: <span id="enemyMana">30</span></p>
 
-  <h2>Scoreboard</h2>
-  <p>Player Wins: <span id="playerWins">0</span></p>
-  <p>Enemy Wins: <span id="enemyWins">0</span></p>
+  <button onclick="playerAction('Attack')">Attack</button>
+  <button onclick="playerAction('Defend')">Defend</button>
+  <button onclick="playerAction('Special')">Special (-20 MP)</button>
+  <button onclick="playerAction('Heal')">Heal (+30 HP, -10 MP)</button>
+  <button onclick="resetGame(true)">Reset Game</button>
+</div>
 
-  <button id="startGameBtn">Start Game</button>
+<h2>Scoreboard</h2>
+<p>Player Wins: <span id="playerWins">0</span></p>
+<p>Enemy Wins: <span id="enemyWins">0</span></p>
 
-  <script>
-    // ===== Wrap everything after DOM loads =====
-    window.addEventListener('load', async () => {
+<button class="startbutton" id="startGameBtn">Start Game</button>
 
-      // ----- Solana Wallet -----
-      let walletAddress = null;
-      const walletSpan = document.getElementById('walletAddress');
-      const connectBtn = document.getElementById('connectWalletBtn');
+<script type="module">
+document.addEventListener("DOMContentLoaded", () => {
+  import { Connection, clusterApiUrl } from 'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js';
+  import { getParsedNftAccountsByOwner } from 'https://cdn.jsdelivr.net/npm/@nfteyez/sol-rayz@1.2.2/dist/index.iife.min.js';
 
-      async function connectWallet() {
-        try {
-          if (window.solana && window.solana.isPhantom) {
-            const resp = await window.solana.connect();
-            walletAddress = resp.publicKey.toString();
-            walletSpan.innerText = walletAddress;
-            connectBtn.style.display = 'none';
-          } else {
-            alert("Phantom wallet not detected. Please install Phantom.");
-          }
-        } catch(e) {
-          console.error(e);
-        }
-      }
+  let playerHealth, enemyHealth, playerMana, enemyMana;
+  let scores = { player: 0, enemy: 0 };
+  let playerDefending=false, enemyDefending=false;
+  let manaRegenInterval, gameLog=[];
+  let playerNFT=null;
 
-      connectBtn.addEventListener('click', connectWallet);
+  const startBtn=document.getElementById('startGameBtn');
+  const gameArea=document.getElementById('gameArea');
+  const charID=document.getElementById('charID');
+  const charSkill=document.getElementById('charSkill');
 
-      // ----- RPG Game Variables -----
-      let playerHealth, enemyHealth, playerMana, enemyMana;
-      let playerDefending = false, enemyDefending = false;
-      let scores = { player: 0, enemy: 0 };
-      let manaRegenInterval;
-      const gameArea = document.getElementById('gameArea');
-      const startBtn = document.getElementById('startGameBtn');
+  // Wallet & NFT
+  async function connectWallet(){
+    if(!window.solana) return alert("Install Phantom Wallet!");
+    const provider=window.solana;
+    await provider.connect();
+    const publicKey=provider.publicKey.toString();
+    console.log("Connected wallet:", publicKey);
+    await loadPlayerNFT(publicKey);
+  }
 
-      function flashBackground(color) {
-        const orig = document.body.style.backgroundColor;
-        document.body.style.backgroundColor = color;
-        setTimeout(() => document.body.style.backgroundColor = orig, 200);
-      }
+  async function loadPlayerNFT(walletAddress){
+    const connection=new Connection(clusterApiUrl('devnet'));
+    const nftArray=await getParsedNftAccountsByOwner({ publicAddress: walletAddress, connection, serialization: true });
+    if(nftArray.length===0){
+      alert("No NFT detected! Default Thunder skill assigned.");
+      playerNFT={id:"DEFAULT", skill:"Thunder"};
+    }else{
+      const nft=nftArray[0];
+      const skillType=["Thunder","Fire","Ice"][Math.floor(Math.random()*3)];
+      playerNFT={id:nft.mint, skill:skillType};
+    }
+    charID.innerText=playerNFT.id;
+    charSkill.innerText=playerNFT.skill;
+  }
 
-      function updateStats() {
-        document.getElementById("playerHealth").innerText = playerHealth;
-        document.getElementById("enemyHealth").innerText = enemyHealth;
-        document.getElementById("playerMana").innerText = playerMana;
-        document.getElementById("enemyMana").innerText = enemyMana;
-      }
+  function flashBackground(color){ const original=document.body.style.backgroundColor; document.body.style.backgroundColor=color; setTimeout(()=>document.body.style.backgroundColor=original,200); }
+  function playSkillAnimation(skill){ const anim=document.createElement("div"); anim.className="skill-animation"; anim.innerText=skill==="Thunder"?"⚡":skill==="Fire"?"🔥":"❄️"; document.body.appendChild(anim); setTimeout(()=>anim.remove(),800); }
+  function updateStats(){ document.getElementById("playerHealth").innerText=playerHealth; document.getElementById("enemyHealth").innerText=enemyHealth; document.getElementById("playerMana").innerText=playerMana; document.getElementById("enemyMana").innerText=enemyMana; }
+  function updateScoreboard(){ document.getElementById("playerWins").innerText=scores.player; document.getElementById("enemyWins").innerText=scores.enemy; }
+  function logAction(text){ gameLog.push(text); console.log(text); }
+  function recapLog(winner){ console.log("=== MATCH ENDED ==="); console.log("Winner:",winner); gameLog.forEach((t,i)=>console.log(i+1+".",t)); }
 
-      function updateScoreboard() {
-        document.getElementById("playerWins").innerText = scores.player;
-        document.getElementById("enemyWins").innerText = scores.enemy;
-      }
+  function resetGame(fullReset=false){
+    playerHealth=100; enemyHealth=100; playerMana=30; enemyMana=30;
+    playerDefending=false; enemyDefending=false; gameLog=[];
+    if(fullReset){ scores={player:0,enemy:0}; updateScoreboard(); }
+    updateStats();
+    if(manaRegenInterval) clearInterval(manaRegenInterval);
+    manaRegenInterval=setInterval(()=>{
+      if(playerMana<30) playerMana++;
+      if(enemyMana<30) enemyMana++;
+      updateStats();
+    },2000);
+  }
 
-      function resetGame(fullReset=false) {
-        playerHealth = enemyHealth = 100;
-        playerMana = enemyMana = 30;
-        playerDefending = enemyDefending = false;
+  function startGame(){
+    if(!playerNFT){ connectWallet().then(()=>startGame()); return; }
+    resetGame(true);
+    gameArea.style.display="block";
+    startBtn.style.display="none";
+    console.log("=== New Game Started === NFT Skill:",playerNFT.skill);
+  }
 
-        if (fullReset) { scores = { player:0, enemy:0 }; updateScoreboard(); }
-        updateStats();
+  function playerAction(action){
+    playerDefending=false;
+    if(action==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; logAction(`Player attacks for ${dmg}.`); flashBackground("red"); }
+    else if(action==="Defend"){ playerDefending=true; logAction("Player defends."); flashBackground("blue"); }
+    else if(action==="Special" && playerMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; playerMana-=20; playSkillAnimation(playerNFT.skill); logAction(`Player Special ${playerNFT.skill} → ${dmg} dmg, -20 MP.`); flashBackground("purple"); }
+    else if(action==="Heal" && playerMana>=10){ playerHealth=Math.min(playerHealth+30,100); playerMana-=10; logAction("Player heals +30 HP."); flashBackground("green"); }
+    else{ logAction("Failed action: Not enough mana."); }
+    updateStats();
+    if(enemyHealth>0) setTimeout(enemyTurn,800);
+    checkGameOver();
+  }
 
-        if (manaRegenInterval) clearInterval(manaRegenInterval);
-        manaRegenInterval = setInterval(() => {
-          if(playerMana<30) playerMana++;
-          if(enemyMana<30) enemyMana++;
-          updateStats();
-        }, 2000);
-      }
+  function enemyTurn(){
+    enemyDefending=false;
+    const skills=["Thunder","Fire","Ice"];
+    let choice;
+    if(enemyHealth<=50 && enemyMana>=10){ choice=Math.random()<0.6?"Heal":"Defend"; }
+    else if(enemyMana>=20 && Math.random()<0.5){ choice="Special"; }
+    else if(Math.random()<0.2){ choice="Defend"; }
+    else{ choice="Attack"; }
 
-      function playerAction(action) {
-        playerDefending = false;
-        if(action==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; alert(`You attacked for ${dmg}!`); flashBackground("red"); }
-        else if(action==="Defend"){ playerDefending=true; alert("You defend this turn."); flashBackground("blue"); }
-        else if(action==="Special" && playerMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; playerMana-=20; alert(`Special Attack! Enemy -${dmg}`); flashBackground("purple"); }
-        else if(action==="Heal" && playerMana>=10){ playerHealth=Math.min(playerHealth+30,100); playerMana-=10; alert("Healed +30 HP"); flashBackground("green"); }
-        else{ alert("Not enough mana!"); }
+    if(choice==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; logAction(`Enemy attacks for ${dmg}.`); flashBackground("orange"); }
+    else if(choice==="Defend"){ enemyDefending=true; logAction("Enemy defends."); flashBackground("blue"); }
+    else if(choice==="Special" && enemyMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; enemyMana-=20; const skill=skills[Math.floor(Math.random()*skills.length)]; playSkillAnimation(skill); logAction(`Enemy Special ${skill} → ${dmg} dmg, -20 MP.`); flashBackground("purple"); }
+    else if(choice==="Heal" && enemyMana>=10){ enemyHealth=Math.min(enemyHealth+30,100); enemyMana-=10; logAction("Enemy heals 30 HP."); flashBackground("green"); }
 
-        updateStats();
-        if(enemyHealth>0) setTimeout(enemyTurn, 800);
-        checkGameOver();
-      }
+    updateStats();
+    checkGameOver();
+  }
 
-      function enemyTurn(){
-        enemyDefending=false;
-        let choice;
-        if(enemyHealth<=50 && enemyMana>=10){ choice=Math.random()<0.6?"Heal":"Defend"; }
-        else if(enemyMana>=20 && Math.random()<0.5){ choice="Special"; }
-        else if(Math.random()<0.2){ choice="Defend"; }
-        else{ choice="Attack"; }
+  function checkGameOver(){
+    if(playerHealth<=0){ logAction("Game Over → Player loses."); recapLog("Enemy"); scores.enemy++; updateScoreboard(); resetGame(); }
+    else if(enemyHealth<=0){ logAction("Game Over → Player wins."); recapLog("Player"); scores.player++; updateScoreboard(); resetGame(); }
+  }
 
-        if(choice==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; alert(`Enemy attacks for ${dmg}!`); flashBackground("orange"); }
-        else if(choice==="Defend"){ enemyDefending=true; alert("Enemy defends"); flashBackground("blue"); }
-        else if(choice==="Special" && enemyMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; enemyMana-=20; alert(`Enemy Special -${dmg}`); flashBackground("purple"); }
-        else if(choice==="Heal" && enemyMana>=10){ enemyHealth=Math.min(enemyHealth+30,100); enemyMana-=10; alert("Enemy healed +30 HP"); flashBackground("green"); }
-
-        updateStats();
-        checkGameOver();
-      }
-
-      function checkGameOver(){
-        if(playerHealth<=0){ alert("You Lose!"); scores.enemy++; updateScoreboard(); resetGame(); }
-        else if(enemyHealth<=0){ alert("You Win!"); scores.player++; updateScoreboard(); resetGame(); }
-      }
-
-      // ----- Start Game Button -----
-      startBtn.addEventListener('click', () => {
-        if(!walletAddress){ alert("Connect Phantom Wallet first!"); return; }
-        resetGame(true);
-        gameArea.style.display = 'block';
-        startBtn.style.display = 'none';
-        alert("Game Started ⚔");
-      });
-
-    }); // End DOM load
-  </script>
+  startBtn.addEventListener("click", startGame);
+});
+</script>
 </body>
 </html>
