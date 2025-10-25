@@ -7,37 +7,209 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Solana Wallet Connect Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RPG Game Solana v1</title>
+  <style>
+    body {
+      background-color: burlywood;
+      font-family: "Times New Roman", serif;
+      color: black;
+      text-align: center;
+      transition: background-color 0.3s ease;
+    }
+    button {
+      border: none;
+      border-radius: 15px;
+      padding: 8px 15px;
+      margin: 5px;
+      background-color: white;
+      color: black;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #gameArea {
+      margin-top: 20px;
+      display: none;
+    }
+  </style>
 </head>
-<body style="text-align:center;padding-top:50px;font-family:sans-serif;">
-  <h1>Solana Wallet Connect Test</h1>
+<body>
 
-  <!-- Connect button -->
-  <button id="connectWalletBtn">Connect Wallet</button>
+  <h1>RPG Game on Solana</h1>
 
-  <p>Wallet Address: <span id="walletAddress">not connected</span></p>
+  <!-- Wallet Connect -->
+  <div>
+    <button onclick="connectWallet()">Connect Solana Wallet</button>
+    <p>Wallet Address: <span id="walletAddress">not connected</span></p>
+  </div>
+
+  <!-- Game Area -->
+  <div id="gameArea">
+    <p>Player Health: <span id="playerHealth">100</span></p>
+    <p>Player Mana: <span id="playerMana">30</span></p>
+    <p>Enemy Health: <span id="enemyHealth">100</span></p>
+    <p>Enemy Mana: <span id="enemyMana">30</span></p>
+
+    <button onclick="playerAction('Attack')">Attack</button>
+    <button onclick="playerAction('Defend')">Defend</button>
+    <button onclick="playerAction('Special')">Special (-20 MP)</button>
+    <button onclick="playerAction('Heal')">Heal (+30 HP, -10 MP)</button>
+    <button onclick="resetGame(true)">Reset Game</button>
+  </div>
+
+  <!-- Scoreboard -->
+  <h2>Scoreboard</h2>
+  <p>Player Wins: <span id="playerWins">0</span></p>
+  <p>Enemy Wins: <span id="enemyWins">0</span></p>
+
+  <button onclick="startGame()">Start Game</button>
+
+  <!-- Solana Web3.js -->
+  <script src="https://unpkg.com/@solana/web3.js@1.79.2/lib/index.iife.min.js"></script>
 
   <script>
-    const connectBtn = document.getElementById('connectWalletBtn');
-    const walletEl = document.getElementById('walletAddress');
+  // ===== Solana Wallet Connection =====
+  let solanaWallet;
 
-    async function connectWallet() {
-      if (window.solana && window.solana.isPhantom) {
-        try {
-          const response = await window.solana.connect();
-          walletEl.innerText = response.publicKey.toString();
-          connectBtn.disabled = true;
-          connectBtn.innerText = "Wallet Connected ✅";
-        } catch (err) {
-          console.error("Connection failed:", err);
-        }
-      } else {
-        alert("Phantom Wallet not found! Please install Phantom.");
+  async function connectWallet() {
+    if (window.solana && window.solana.isPhantom) {
+      try {
+        const resp = await window.solana.connect();
+        solanaWallet = window.solana;
+        document.getElementById('walletAddress').innerText = resp.publicKey.toString();
+        alert("Wallet connected: " + resp.publicKey.toString());
+      } catch (err) {
+        console.error("Wallet connection failed:", err);
       }
+    } else {
+      alert("Phantom Wallet not found! Install Phantom first.");
+    }
+  }
+
+  if (window.solana && window.solana.isPhantom) {
+    window.solana.connect({ onlyIfTrusted: true }).then(resp => {
+      solanaWallet = window.solana;
+      document.getElementById('walletAddress').innerText = resp.publicKey.toString();
+    }).catch(()=>{});
+  }
+
+  // ===== Solana Devnet Transaction =====
+  const connection = new solanaWeb3.Connection(
+    solanaWeb3.clusterApiUrl('devnet'),
+    'confirmed'
+  );
+
+  async function recordWinOnChain() {
+    if (!solanaWallet || !solanaWallet.isConnected) {
+      alert("Connect your wallet first!");
+      return;
     }
 
-    connectBtn.addEventListener('click', connectWallet);
+    const fromPubkey = solanaWallet.publicKey;
+    const toPubkey = new solanaWeb3.PublicKey('ENTER_TREASURY_WALLET_ADDRESS_HERE');
+
+    const transaction = new solanaWeb3.Transaction().add(
+      solanaWeb3.SystemProgram.transfer({
+        fromPubkey,
+        toPubkey,
+        lamports: 1000 // tiny transaction for test
+      })
+    );
+
+    try {
+      const { signature } = await solanaWallet.signAndSendTransaction(transaction);
+      await connection.confirmTransaction(signature);
+      console.log("Transaction confirmed:", signature);
+      alert("Win recorded on Solana Devnet! Tx: " + signature);
+    } catch (err) {
+      console.error("Transaction failed:", err);
+      alert("Transaction failed: " + err.message);
+    }
+  }
+
+  // ===== RPG Game Logic =====
+  let playerHealth, enemyHealth, playerMana, enemyMana;
+  let scores = { player: 0, enemy: 0 };
+  let playerDefending = false, enemyDefending = false;
+  let manaRegenInterval;
+  let gameLog = [];
+
+  function flashBackground(color) {
+    let original = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = color;
+    setTimeout(()=>document.body.style.backgroundColor = original,200);
+  }
+
+  function startGame() {
+    resetGame(true);
+    document.getElementById("gameArea").style.display = "block";
+    document.querySelector("button[onclick='startGame()']").style.display = "none";
+    alert("Welcome to the Arena ⚔!");
+    console.log("=== New Game Started ===");
+  }
+
+  function resetGame(fullReset=false){
+    playerHealth=100; enemyHealth=100; playerMana=30; enemyMana=30;
+    playerDefending=false; enemyDefending=false; gameLog=[];
+    if(fullReset){ scores={player:0,enemy:0}; updateScoreboard(); console.log("Score reset."); }
+    updateStats();
+    if(manaRegenInterval) clearInterval(manaRegenInterval);
+    manaRegenInterval=setInterval(()=>{
+      if(playerMana<30) playerMana++;
+      if(enemyMana<30) enemyMana++;
+      updateStats();
+    },2000);
+  }
+
+  function updateStats(){
+    document.getElementById("playerHealth").innerText=playerHealth;
+    document.getElementById("enemyHealth").innerText=enemyHealth;
+    document.getElementById("playerMana").innerText=playerMana;
+    document.getElementById("enemyMana").innerText=enemyMana;
+  }
+
+  function updateScoreboard(){
+    document.getElementById("playerWins").innerText=scores.player;
+    document.getElementById("enemyWins").innerText=scores.enemy;
+  }
+
+  function logAction(text){ gameLog.push(text); console.log(text); }
+  function recapLog(winner){ console.log("=== MATCH ENDED ==="); console.log("Winner: "+winner); gameLog.forEach((e,i)=>console.log((i+1)+". "+e)); console.log("================"); }
+
+  function playerAction(action){
+    playerDefending=false;
+    if(action==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; alert(`You attacked for ${dmg}!`); logAction(`Player attacks ${dmg}`); flashBackground("red"); }
+    else if(action==="Defend"){ playerDefending=true; alert("You defend this turn."); logAction("Player defends"); flashBackground("blue"); }
+    else if(action==="Special" && playerMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; playerMana-=20; alert(`Special Attack! Enemy takes ${dmg}!`); logAction(`Player special ${dmg} dmg, -20MP`); flashBackground("purple"); }
+    else if(action==="Heal" && playerMana>=10){ playerHealth=Math.min(playerHealth+30,100); playerMana-=10; alert("Healed 30 HP"); logAction("Player heals +30 HP"); flashBackground("green"); }
+    else{ alert("Not enough mana"); logAction("Failed action: Not enough mana"); }
+    updateStats();
+    if(enemyHealth>0) setTimeout(enemyTurn,800);
+    checkGameOver();
+  }
+
+  function enemyTurn(){
+    enemyDefending=false;
+    let choice;
+    if(enemyHealth<=50 && enemyMana>=10){ choice=Math.random()<0.6?"Heal":"Defend"; }
+    else if(enemyMana>=20 && Math.random()<0.5){ choice="Special"; }
+    else if(Math.random()<0.2){ choice="Defend"; }
+    else{ choice="Attack"; }
+
+    if(choice==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; alert(`Enemy attacks for ${dmg}`); logAction(`Enemy attacks ${dmg}`); flashBackground("orange"); }
+    else if(choice==="Defend"){ enemyDefending=true; alert("Enemy defends"); logAction("Enemy defends"); flashBackground("blue"); }
+    else if(choice==="Special" && enemyMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; enemyMana-=20; alert(`Enemy Special ${dmg} dmg`); logAction(`Enemy special ${dmg} dmg`); flashBackground("purple"); }
+    else if(choice==="Heal" && enemyMana>=10){ enemyHealth=Math.min(enemyHealth+30,100); enemyMana-=10; alert("Enemy heals 30 HP"); logAction("Enemy heals +30 HP"); flashBackground("green"); }
+
+    updateStats();
+    checkGameOver();
+  }
+
+  function checkGameOver(){
+    if(playerHealth<=0){ alert("You Lose"); logAction("Player loses"); recapLog("Enemy"); scores.enemy++; updateScoreboard(); resetGame(); }
+    else if(enemyHealth<=0){ alert("You Win"); logAction("Player wins"); recapLog("Player"); scores.player++; updateScoreboard(); resetGame(); recordWinOnChain(); }
+  }
+
   </script>
 </body>
 </html>
