@@ -2,24 +2,39 @@
 
 
 
+
 <!DOCTYPE html>
-<html>
-<body>
-<div id="ton-connect"></div>
-<p>Wallet Address: <span id="walletAddress">not connected</span></p>
-<script type="module">
-import { TonConnectUI } from 'https://cdn.jsdelivr.net/npm/@tonconnect/ui@2.0.9/dist/tonconnect-ui.esm.min.js';
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TON Connect Test</title>
+</head>
+<body style="text-align:center;padding-top:50px;font-family:sans-serif;">
 
-const tonConnectUI = new TonConnectUI({
-  manifestUrl: 'https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json',
-  buttonRootId: 'ton-connect'
-});
-tonConnectUI.render();
+  <h1>TON Wallet Connect Test</h1>
+  
+  <!-- TonConnect button renders here -->
+  <div id="ton-connect"></div>
+  
+  <p>Wallet Address: <span id="walletAddress">not connected</span></p>
 
-setInterval(()=>{
-  const account = tonConnectUI.account;
-  document.getElementById('walletAddress').innerText = (account?.address) || 'not connected';
-}, 1000);
-</script>
+  <!-- ES module for TonConnectUI -->
+  <script type="module">
+    import { TonConnectUI } from 'https://cdn.jsdelivr.net/npm/@tonconnect/ui@2.0.9/dist/tonconnect-ui.esm.min.js';
+
+    const tonConnectUI = new TonConnectUI({
+      manifestUrl: 'https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json',
+      buttonRootId: 'ton-connect'
+    });
+
+    tonConnectUI.render();
+
+    setInterval(() => {
+      const account = tonConnectUI.account;
+      document.getElementById('walletAddress').innerText = account?.address || 'not connected';
+    }, 1000);
+  </script>
+
 </body>
 </html>
