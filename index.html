@@ -2,53 +2,39 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TON Wallet Connect Test</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TON RPG Game</title>
+<style>
+body{background-color:burlywood;font-family:"Times New Roman",serif;color:black;text-align:center;transition:background-color .3s}button{border:none;border-radius:15px;padding:8px 15px;margin:5px;background-color:white;color:black;font-weight:bold;cursor:pointer}#gameArea{margin-top:20px;display:none}
+</style>
 </head>
-<body style="font-family:sans-serif;text-align:center;padding-top:100px;">
-
-  <h1>TON Wallet Connection Test</h1>
-
-  <!-- The TonConnect button will appear here -->
-  <div id="ton-connect"></div>
-
-  <p>Wallet Address: <span id="walletAddress">not connected</span></p>
-
-  <!-- TonConnect UI Library -->
-  <script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
-
-  <script>
-    // Create TonConnect UI instance with GitHub Pages manifest URL
-    const tonConnectUI = new TonConnectUI({
-      manifestUrl: 'https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json',
-      buttonRootId: 'ton-connect'
-    });
-
-    // Force render the connect button immediately
-    tonConnectUI.render();
-
-    // Sync wallet status
-    async function syncWallet() {
-      try {
-        const account = tonConnectUI.account;
-        const walletEl = document.getElementById('walletAddress');
-        if (account && account.address) {
-          walletEl.innerText = account.address;
-        } else {
-          walletEl.innerText = 'not connected';
-        }
-      } catch (e) {
-        console.warn("Sync wallet error:", e);
-      }
-    }
-
-    // Check wallet every 1.5 seconds
-    setInterval(syncWallet, 1500);
-  </script>
-
+<body>
+<h1>TON RPG Game</h1>
+<div id="ton-connect"></div>
+<p>Wallet Address: <span id="walletAddress">not connected</span></p>
+<div id="gameArea">
+<p>Player Health: <span id="playerHealth">100</span></p>
+<p>Player Mana: <span id="playerMana">30</span></p>
+<p>Enemy Health: <span id="enemyHealth">100</span></p>
+<p>Enemy Mana: <span id="enemyMana">30</span></p>
+<button onclick="playerAction('Attack')">Attack</button>
+<button onclick="playerAction('Defend')">Defend</button>
+<button onclick="playerAction('Special')">Special (-20 MP)</button>
+<button onclick="playerAction('Heal')">Heal (+30 HP, -10 MP)</button>
+<button onclick="resetGame(true)">Reset Game</button>
+</div>
+<h2>Scoreboard</h2>
+<p>Player Wins: <span id="playerWins">0</span></p>
+<p>Enemy Wins: <span id="enemyWins">0</span></p>
+<button id="startGameBtn">Start Game</button>
+<script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
+<script>
+window.addEventListener("load",()=>{if(!window.TonConnectUI)return console.error("TonConnectUI failed to load!");const e=new TonConnectUI({manifestUrl:"https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json",buttonRootId:"ton-connect"});e.render();setInterval(()=>{const t=e.account;document.getElementById("walletAddress").innerText=t&&t.address?t.address:"not connected"},1500),document.getElementById("startGameBtn").addEventListener("click",()=>{e.account&&e.account.address?(document.getElementById("gameArea").style.display="block",document.getElementById("startGameBtn").style.display="none",alert("Welcome to the Arena ⚔!")):alert("Connect your TON Wallet first!")})});let playerHealth=100,enemyHealth=100,playerMana=30,enemyMana=30,playerDefending=!1,enemyDefending=!1,scores={player:0,enemy:0},manaRegenInterval;function flashBackground(e){let t=document.body.style.backgroundColor;document.body.style.backgroundColor=e,setTimeout(()=>document.body.style.backgroundColor=t,200)}function updateStats(){document.getElementById("playerHealth").innerText=playerHealth,document.getElementById("enemyHealth").innerText=enemyHealth,document.getElementById("playerMana").innerText=playerMana,document.getElementById("enemyMana").innerText=enemyMana}function updateScoreboard(){document.getElementById("playerWins").innerText=scores.player,document.getElementById("enemyWins").innerText=scores.enemy}function resetGame(e=!1){playerHealth=enemyHealth=100,playerMana=enemyMana=30,playerDefending=enemyDefending=!1,e&&(scores={player:0,enemy:0},updateScoreboard()),updateStats(),manaRegenInterval&&clearInterval(manaRegenInterval),manaRegenInterval=setInterval(()=>{playerMana<30&&(playerMana+=1),enemyMana<30&&(enemyMana+=1),updateStats()},2e3)}function playerAction(e){playerDefending=!1,"Attack"===e?(d=Math.floor(10*Math.random()+10),enemyDefending&&(d=Math.floor(d/2)),enemyHealth-=d,alert(`You attacked for ${d}!`),flashBackground("red")):"Defend"===e?(playerDefending=!0,alert("You defend this turn."),flashBackground("blue")):"Special"===e&&playerMana>=20?(d=Math.floor(15*Math.random()+25),enemyDefending&&(d=Math.floor(d/2)),enemyHealth-=d,playerMana-=20,alert(`You used a Special Attack! Enemy takes ${d} damage!`),flashBackground("purple")):"Heal"===e&&playerMana>=10?(playerHealth=Math.min(playerHealth+30,100),playerMana-=10,alert("You healed for 30 HP!"),flashBackground("green")):alert("Not enough mana!"),updateStats(),enemyHealth>0&&setTimeout(enemyTurn,800),checkGameOver()}function enemyTurn(){enemyDefending=!1;let e;e=enemyHealth<=50&&enemyMana>=10?Math.random()<.6?"Heal":"Defend":enemyMana>=20&&Math.random()<.5?"Special":Math.random()<.2?"Defend":"Attack","Attack"===e?(d=Math.floor(10*Math.random()+10),playerDefending&&(d=Math.floor(d/2)),playerHealth-=d,alert(`Enemy attacks you for ${d}!`),flashBackground("orange")):"Defend"===e?(enemyDefending=!0,alert("Enemy defends this turn."),flashBackground("blue")):"Special"===e&&enemyMana>=20?(d=Math.floor(15*Math.random()+25),playerDefending&&(d=Math.floor(d/2)),playerHealth-=d,enemyMana-=20,alert(`Enemy uses Special Attack! You take ${d} damage!`),flashBackground("purple")):"Heal"===e&&enemyMana>=10&&(enemyHealth=Math.min(enemyHealth+30,100),enemyMana-=10,alert("Enemy heals for 30 HP!"),flashBackground("green")),updateStats(),checkGameOver()}function checkGameOver(){playerHealth<=0?(alert("You Lose!"),scores.enemy++,updateScoreboard(),resetGame()):enemyHealth<=0&&(alert("You Win!"),scores.player++,updateScoreboard(),resetGame())}
+</script>
 </body>
 </html>
