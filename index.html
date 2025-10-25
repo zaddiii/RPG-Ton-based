@@ -9,17 +9,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NFT RPG Game - Solana</title>
 <style>
-  body { background-color: burlywood; font-family: "Times New Roman", serif; color: black; text-align: center; transition: background-color 0.3s ease; }
-  #gameArea button, .startbutton { border: none; border-radius: 15px; padding: 8px 15px; margin: 5px; background-color: white; color: black; font-weight: bold; cursor: pointer; }
+  body {
+    background-color: burlywood;
+    font-family: "Times New Roman", serif;
+    color: black;
+    text-align: center;
+    transition: background-color 0.3s ease;
+  }
+  button {
+    border: none;
+    border-radius: 15px;
+    padding: 8px 15px;
+    margin: 5px;
+    background-color: white;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+  }
   #gameArea { margin-top: 20px; display: none; }
-  #sidebar { position: fixed; right: 0; top: 0; width: 220px; background: #f5deb3; padding: 10px; border-left: 2px solid #000; height: 100%; text-align: left; }
-  .skill-animation { font-size: 50px; animation: fly 0.8s forwards; position: absolute; left: 50%; top: 50%; }
-  @keyframes fly { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; } }
+  #sidebar {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 220px;
+    background: #f5deb3;
+    padding: 10px;
+    border-left: 2px solid #000;
+    height: 100%;
+    text-align: left;
+  }
+  .skill-animation {
+    font-size: 50px;
+    animation: fly 0.8s forwards;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+  }
+  @keyframes fly {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+    100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; }
+  }
+  #messages { margin-top: 10px; min-height: 24px; font-weight: bold; }
 </style>
 </head>
 <body>
 
 <h1>NFT RPG Game - Solana</h1>
+
+<button id="connectBtn">Connect Wallet</button>
+<p>Wallet Address: <span id="walletAddress">not connected</span></p>
+<div id="messages"></div>
 
 <div id="sidebar">
   <h3>Your NFT Character</h3>
@@ -44,114 +83,203 @@
 <p>Player Wins: <span id="playerWins">0</span></p>
 <p>Enemy Wins: <span id="enemyWins">0</span></p>
 
-<button class="startbutton" id="startGameBtn">Start Game</button>
+<button id="startGameBtn" style="display:none;">Start Game</button>
 
 <script type="module">
-document.addEventListener("DOMContentLoaded", () => {
-  import { Connection, clusterApiUrl } from 'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js';
-  import { getParsedNftAccountsByOwner } from 'https://cdn.jsdelivr.net/npm/@nfteyez/sol-rayz@1.2.2/dist/index.iife.min.js';
+import { Connection, clusterApiUrl } from 'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js';
+import { getParsedNftAccountsByOwner } from 'https://cdn.jsdelivr.net/npm/@nfteyez/sol-rayz@1.2.2/dist/index.iife.min.js';
 
-  let playerHealth, enemyHealth, playerMana, enemyMana;
-  let scores = { player: 0, enemy: 0 };
-  let playerDefending=false, enemyDefending=false;
-  let manaRegenInterval, gameLog=[];
-  let playerNFT=null;
+let playerHealth, enemyHealth, playerMana, enemyMana;
+let scores = { player:0, enemy:0 };
+let playerDefending=false, enemyDefending=false;
+let manaRegenInterval, gameLog=[];
+let playerNFT=null;
 
-  const startBtn=document.getElementById('startGameBtn');
-  const gameArea=document.getElementById('gameArea');
-  const charID=document.getElementById('charID');
-  const charSkill=document.getElementById('charSkill');
+const connectBtn = document.getElementById('connectBtn');
+const startBtn = document.getElementById('startGameBtn');
+const gameArea = document.getElementById('gameArea');
+const charID = document.getElementById('charID');
+const charSkill = document.getElementById('charSkill');
+const walletSpan = document.getElementById('walletAddress');
+const messages = document.getElementById('messages');
 
-  // Wallet & NFT
-  async function connectWallet(){
-    if(!window.solana) return alert("Install Phantom Wallet!");
-    const provider=window.solana;
+let provider = window.solana;
+if(!provider){ messages.innerText="Phantom Wallet not detected."; connectBtn.disabled=true; }
+
+connectBtn.onclick = async () => {
+  try {
     await provider.connect();
-    const publicKey=provider.publicKey.toString();
-    console.log("Connected wallet:", publicKey);
-    await loadPlayerNFT(publicKey);
-  }
+    walletSpan.innerText = provider.publicKey.toString();
+    connectBtn.style.display="none";
+    startBtn.style.display="inline-block";
+    messages.innerText="Wallet connected! Loading NFT...";
+    await loadPlayerNFT(provider.publicKey.toString());
+    messages.innerText="NFT loaded. Ready to start!";
+  } catch(e){ console.error(e); messages.innerText="Wallet connection failed.";}
+};
 
-  async function loadPlayerNFT(walletAddress){
-    const connection=new Connection(clusterApiUrl('devnet'));
-    const nftArray=await getParsedNftAccountsByOwner({ publicAddress: walletAddress, connection, serialization: true });
-    if(nftArray.length===0){
-      alert("No NFT detected! Default Thunder skill assigned.");
-      playerNFT={id:"DEFAULT", skill:"Thunder"};
-    }else{
-      const nft=nftArray[0];
-      const skillType=["Thunder","Fire","Ice"][Math.floor(Math.random()*3)];
-      playerNFT={id:nft.mint, skill:skillType};
-    }
-    charID.innerText=playerNFT.id;
-    charSkill.innerText=playerNFT.skill;
-  }
+async function loadPlayerNFT(walletAddress){
+  const connection = new Connection(clusterApiUrl('devnet'));
+  let nftArray=[];
+  try{
+    nftArray = await getParsedNftAccountsByOwner({ publicAddress: walletAddress, connection, serialization:true });
+  } catch(e){ console.error(e); }
 
-  function flashBackground(color){ const original=document.body.style.backgroundColor; document.body.style.backgroundColor=color; setTimeout(()=>document.body.style.backgroundColor=original,200); }
-  function playSkillAnimation(skill){ const anim=document.createElement("div"); anim.className="skill-animation"; anim.innerText=skill==="Thunder"?"⚡":skill==="Fire"?"🔥":"❄️"; document.body.appendChild(anim); setTimeout(()=>anim.remove(),800); }
-  function updateStats(){ document.getElementById("playerHealth").innerText=playerHealth; document.getElementById("enemyHealth").innerText=enemyHealth; document.getElementById("playerMana").innerText=playerMana; document.getElementById("enemyMana").innerText=enemyMana; }
-  function updateScoreboard(){ document.getElementById("playerWins").innerText=scores.player; document.getElementById("enemyWins").innerText=scores.enemy; }
-  function logAction(text){ gameLog.push(text); console.log(text); }
-  function recapLog(winner){ console.log("=== MATCH ENDED ==="); console.log("Winner:",winner); gameLog.forEach((t,i)=>console.log(i+1+".",t)); }
-
-  function resetGame(fullReset=false){
-    playerHealth=100; enemyHealth=100; playerMana=30; enemyMana=30;
-    playerDefending=false; enemyDefending=false; gameLog=[];
-    if(fullReset){ scores={player:0,enemy:0}; updateScoreboard(); }
-    updateStats();
-    if(manaRegenInterval) clearInterval(manaRegenInterval);
-    manaRegenInterval=setInterval(()=>{
-      if(playerMana<30) playerMana++;
-      if(enemyMana<30) enemyMana++;
-      updateStats();
-    },2000);
-  }
-
-  function startGame(){
-    if(!playerNFT){ connectWallet().then(()=>startGame()); return; }
-    resetGame(true);
-    gameArea.style.display="block";
-    startBtn.style.display="none";
-    console.log("=== New Game Started === NFT Skill:",playerNFT.skill);
-  }
-
-  function playerAction(action){
-    playerDefending=false;
-    if(action==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; logAction(`Player attacks for ${dmg}.`); flashBackground("red"); }
-    else if(action==="Defend"){ playerDefending=true; logAction("Player defends."); flashBackground("blue"); }
-    else if(action==="Special" && playerMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; playerMana-=20; playSkillAnimation(playerNFT.skill); logAction(`Player Special ${playerNFT.skill} → ${dmg} dmg, -20 MP.`); flashBackground("purple"); }
-    else if(action==="Heal" && playerMana>=10){ playerHealth=Math.min(playerHealth+30,100); playerMana-=10; logAction("Player heals +30 HP."); flashBackground("green"); }
-    else{ logAction("Failed action: Not enough mana."); }
-    updateStats();
-    if(enemyHealth>0) setTimeout(enemyTurn,800);
-    checkGameOver();
-  }
-
-  function enemyTurn(){
-    enemyDefending=false;
+  if(nftArray.length===0){
+    playerNFT={ id:"DEFAULT", skill:"Thunder" };
+  } else {
+    const nft = nftArray[0];
     const skills=["Thunder","Fire","Ice"];
-    let choice;
-    if(enemyHealth<=50 && enemyMana>=10){ choice=Math.random()<0.6?"Heal":"Defend"; }
-    else if(enemyMana>=20 && Math.random()<0.5){ choice="Special"; }
-    else if(Math.random()<0.2){ choice="Defend"; }
-    else{ choice="Attack"; }
+    const skillType = skills[Math.floor(Math.random()*3)];
+    playerNFT={ id: nft.mint, skill: skillType };
+  }
+  charID.innerText=playerNFT.id;
+  charSkill.innerText=playerNFT.skill;
+}
 
-    if(choice==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; logAction(`Enemy attacks for ${dmg}.`); flashBackground("orange"); }
-    else if(choice==="Defend"){ enemyDefending=true; logAction("Enemy defends."); flashBackground("blue"); }
-    else if(choice==="Special" && enemyMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; enemyMana-=20; const skill=skills[Math.floor(Math.random()*skills.length)]; playSkillAnimation(skill); logAction(`Enemy Special ${skill} → ${dmg} dmg, -20 MP.`); flashBackground("purple"); }
-    else if(choice==="Heal" && enemyMana>=10){ enemyHealth=Math.min(enemyHealth+30,100); enemyMana-=10; logAction("Enemy heals 30 HP."); flashBackground("green"); }
+// ===== RPG Logic =====
+function flashBackground(color){
+  const original=document.body.style.backgroundColor;
+  document.body.style.backgroundColor=color;
+  setTimeout(()=>document.body.style.backgroundColor=original,200);
+}
 
+function startGame(){
+  if(!playerNFT){ messages.innerText="Connect wallet and load NFT first!"; return; }
+  resetGame(true);
+  gameArea.style.display="block";
+  startBtn.style.display="none";
+  messages.innerText="Game started! Make your move!";
+}
+
+function resetGame(fullReset=false){
+  playerHealth=100; enemyHealth=100; playerMana=30; enemyMana=30;
+  playerDefending=false; enemyDefending=false; gameLog=[];
+  if(fullReset){ scores={player:0, enemy:0}; updateScoreboard(); }
+  updateStats();
+  if(manaRegenInterval) clearInterval(manaRegenInterval);
+  manaRegenInterval=setInterval(()=>{
+    if(playerMana<30) playerMana++;
+    if(enemyMana<30) enemyMana++;
     updateStats();
-    checkGameOver();
-  }
+  },2000);
+}
 
-  function checkGameOver(){
-    if(playerHealth<=0){ logAction("Game Over → Player loses."); recapLog("Enemy"); scores.enemy++; updateScoreboard(); resetGame(); }
-    else if(enemyHealth<=0){ logAction("Game Over → Player wins."); recapLog("Player"); scores.player++; updateScoreboard(); resetGame(); }
-  }
+function updateStats(){
+  document.getElementById("playerHealth").innerText=playerHealth;
+  document.getElementById("enemyHealth").innerText=enemyHealth;
+  document.getElementById("playerMana").innerText=playerMana;
+  document.getElementById("enemyMana").innerText=enemyMana;
+}
 
-  startBtn.addEventListener("click", startGame);
-});
+function updateScoreboard(){
+  document.getElementById("playerWins").innerText=scores.player;
+  document.getElementById("enemyWins").innerText=scores.enemy;
+}
+
+function playSkillAnimation(skill){
+  const anim=document.createElement("div");
+  anim.className="skill-animation";
+  anim.innerText=skill==="Thunder"?"⚡":skill==="Fire"?"🔥":"❄️";
+  document.body.appendChild(anim);
+  setTimeout(()=>anim.remove(),800);
+}
+
+function logAction(text){ gameLog.push(text); messages.innerText=text; console.log(text); }
+
+function checkGameOver(){
+  if(playerHealth<=0 || enemyHealth<=0){
+    const winner = playerHealth>0?"Player":"Enemy";
+    messages.innerText=`${winner} wins!`;
+    if(winner==="Player") scores.player++; else scores.enemy++;
+    updateScoreboard();
+    recapLog(winner);
+    resetGame(false);
+  }
+}
+
+function recapLog(winner){
+  console.log("=== MATCH ENDED ==="); console.log("Winner:",winner); gameLog.forEach((t,i)=>console.log(i+1+".",t));
+}
+
+function playerAction(action){
+  playerDefending=false;
+  if(action==="Attack"){
+    let dmg=Math.floor(Math.random()*10)+10;
+    if(enemyDefending)dmg=Math.floor(dmg/2);
+    enemyHealth-=dmg;
+    logAction(`Player attacks for ${dmg}.`);
+    flashBackground("red");
+  }
+  else if(action==="Defend"){
+    playerDefending=true;
+    logAction("Player defends.");
+    flashBackground("blue");
+  }
+  else if(action==="Special" && playerMana>=20){
+    let dmg=Math.floor(Math.random()*15)+25;
+    if(enemyDefending)dmg=Math.floor(dmg/2);
+    enemyHealth-=dmg;
+    playerMana-=20;
+    playSkillAnimation(playerNFT.skill);
+    logAction(`Player uses ${playerNFT.skill} Special for ${dmg} dmg.`);
+    flashBackground("purple");
+  }
+  else if(action==="Heal" && playerMana>=10){
+    playerHealth=Math.min(playerHealth+30,100);
+    playerMana-=10;
+    logAction("Player heals +30 HP.");
+    flashBackground("green");
+  }
+  else{ logAction("Not enough mana."); }
+  updateStats();
+  if(enemyHealth>0) setTimeout(enemyTurn,800);
+  checkGameOver();
+}
+
+function enemyTurn(){
+  enemyDefending=false;
+  const skills=["Thunder","Fire","Ice"];
+  let choice;
+  if(enemyHealth<=50 && enemyMana>=10){ choice=Math.random()<0.6?"Heal":"Defend"; }
+  else if(enemyMana>=20 && Math.random()<0.5){ choice="Special"; }
+  else if(Math.random()<0.2){ choice="Defend"; }
+  else{ choice="Attack"; }
+
+  if(choice==="Attack"){
+    let dmg=Math.floor(Math.random()*10)+10;
+    if(playerDefending)dmg=Math.floor(dmg/2);
+    playerHealth-=dmg;
+    logAction(`Enemy attacks for ${dmg}.`);
+    flashBackground("orange");
+  }
+  else if(choice==="Defend"){
+    enemyDefending=true;
+    logAction("Enemy defends.");
+    flashBackground("blue");
+  }
+  else if(choice==="Special" && enemyMana>=20){
+    let dmg=Math.floor(Math.random()*15)+25;
+    if(playerDefending)dmg=Math.floor(dmg/2);
+    playerHealth-=dmg;
+    enemyMana-=20;
+    const skill=skills[Math.floor(Math.random()*skills.length)];
+    playSkillAnimation(skill);
+    logAction(`Enemy uses ${skill} Special for ${dmg} dmg.`);
+    flashBackground("purple");
+  }
+  else if(choice==="Heal" && enemyMana>=10){
+    enemyHealth=Math.min(enemyHealth+30,100);
+    enemyMana-=10;
+    logAction("Enemy heals +30 HP.");
+    flashBackground("green");
+  }
+  updateStats();
+  checkGameOver();
+}
+
+startBtn.onclick=startGame;
+
 </script>
 </body>
 </html>
