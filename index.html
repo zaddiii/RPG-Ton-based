@@ -51,79 +51,89 @@
 
 <button id="startGameBtn" style="display:none;">Start Game</button>
 
-<script type="module">
-import { Connection, clusterApiUrl } from 'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js';
-import { getParsedNftAccountsByOwner } from 'https://cdn.jsdelivr.net/npm/@nfteyez/sol-rayz@1.2.2/dist/index.iife.min.js';
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@nfteyez/sol-rayz@1.2.2/dist/index.iife.min.js"></script>
 
-let playerHealth, enemyHealth, playerMana, enemyMana;
-let scores = { player:0, enemy:0 };
-let playerDefending=false, enemyDefending=false;
-let manaRegenInterval, gameLog=[];
-let playerNFT=null;
-
+<script>
+let provider = window.solana;
 const connectBtn = document.getElementById('connectBtn');
 const startBtn = document.getElementById('startGameBtn');
-const gameArea = document.getElementById('gameArea');
-const charID = document.getElementById('charID');
-const charSkill = document.getElementById('charSkill');
 const walletSpan = document.getElementById('walletAddress');
 const messages = document.getElementById('messages');
+let playerNFT = null;
 
-let provider = window.solana;
+// Check wallet presence
 if (!provider || !provider.isPhantom) {
-  messages.innerText = "Phantom Wallet not detected!";
-  connectBtn.disabled = true;
+    messages.innerText = "Phantom/Fatum Wallet not detected!";
+    connectBtn.disabled = true;
+} else {
+    messages.innerText = "Wallet detected. Ready to connect!";
 }
 
-// ==== Phantom Wallet Connect ====
+// Connect wallet
 connectBtn.onclick = async () => {
-  try {
-    const resp = await provider.connect();
-    walletSpan.innerText = resp.publicKey.toString();
-    connectBtn.style.display = "none";
-    startBtn.style.display = "inline-block";
-    messages.innerText = "Wallet connected! Loading NFT...";
-    await loadPlayerNFT(resp.publicKey.toString());
-    messages.innerText = "NFT loaded. Ready to start!";
-  } catch(e) {
-    console.error(e);
-    messages.innerText = "Wallet connection failed.";
-  }
+    try {
+        const resp = await provider.connect();
+        walletSpan.innerText = resp.publicKey.toString();
+        connectBtn.style.display = "none";
+        startBtn.style.display = "inline-block";
+        messages.innerText = "Wallet connected! Loading NFT...";
+        await loadPlayerNFT(resp.publicKey.toString());
+        messages.innerText = "NFT loaded. Ready to start!";
+    } catch (e) {
+        console.error(e);
+        messages.innerText = "Wallet connection failed. Refresh browser.";
+    }
 };
 
 // Detect account changes or disconnect
 provider?.on("accountChanged", async (publicKey) => {
-  if (publicKey) {
-    walletSpan.innerText = publicKey.toString();
-    messages.innerText = "Wallet account changed!";
-    await loadPlayerNFT(publicKey.toString());
-  } else {
-    walletSpan.innerText = "not connected";
-    messages.innerText = "Wallet disconnected!";
-    connectBtn.style.display = "inline-block";
-    startBtn.style.display = "none";
-  }
+    if (publicKey) {
+        walletSpan.innerText = publicKey.toString();
+        messages.innerText = "Wallet account changed!";
+        await loadPlayerNFT(publicKey.toString());
+    } else {
+        walletSpan.innerText = "not connected";
+        messages.innerText = "Wallet disconnected!";
+        connectBtn.style.display = "inline-block";
+        startBtn.style.display = "none";
+    }
 });
 
-// Load player's NFT
+// Load player NFT
 async function loadPlayerNFT(walletAddress){
-  const connection = new Connection(clusterApiUrl('devnet'));
-  let nftArray=[];
-  try { nftArray = await getParsedNftAccountsByOwner({ publicAddress: walletAddress, connection, serialization:true }); }
-  catch(e){ console.error(e); }
+    try {
+        const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'));
+        const nftArray = await getParsedNftAccountsByOwner({
+            publicAddress: walletAddress,
+            connection,
+            serialization: true
+        });
 
-  if(nftArray.length === 0) {
-    playerNFT = { id: "DEFAULT", skill: "Thunder" };
-  } else {
-    const nft = nftArray[0];
-    const skills = ["Thunder","Fire","Ice"];
-    playerNFT = { id: nft.mint, skill: skills[Math.floor(Math.random()*3)] };
-  }
-  charID.innerText = playerNFT.id;
-  charSkill.innerText = playerNFT.skill;
+        if(nftArray.length === 0){
+            playerNFT = { id: "DEFAULT", skill: "Thunder" };
+        } else {
+            const nft = nftArray[0];
+            const skills = ["Thunder","Fire","Ice"];
+            playerNFT = { id: nft.mint, skill: skills[Math.floor(Math.random()*3)] };
+        }
+
+        document.getElementById('charID').innerText = playerNFT.id;
+        document.getElementById('charSkill').innerText = playerNFT.skill;
+
+    } catch (e) {
+        console.error(e);
+        messages.innerText = "Failed to load NFT. Make sure you are on Devnet.";
+    }
 }
 
 // ===== RPG Logic =====
+let playerHealth, enemyHealth, playerMana, enemyMana;
+let scores = { player:0, enemy:0 };
+let playerDefending=false, enemyDefending=false;
+let manaRegenInterval, gameLog=[];
+
 function flashBackground(color){ const o=document.body.style.backgroundColor; document.body.style.backgroundColor=color; setTimeout(()=>document.body.style.backgroundColor=o,200); }
 function startGame(){ if(!playerNFT){ messages.innerText="Connect wallet first!"; return; } resetGame(true); gameArea.style.display="block"; startBtn.style.display="none"; messages.innerText="Game started! Make your move!"; }
 function resetGame(fullReset=false){ playerHealth=100; enemyHealth=100; playerMana=30; enemyMana=30; playerDefending=false; enemyDefending=false; gameLog=[]; if(fullReset){ scores={player:0,enemy:0}; updateScoreboard(); } updateStats(); if(manaRegenInterval) clearInterval(manaRegenInterval); manaRegenInterval=setInterval(()=>{ if(playerMana<30) playerMana++; if(enemyMana<30) enemyMana++; updateStats(); },2000); }
