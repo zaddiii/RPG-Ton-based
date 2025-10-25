@@ -2,6 +2,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,46 +10,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NFT RPG Game - Solana</title>
 <style>
-  body {
-    background-color: burlywood;
-    font-family: "Times New Roman", serif;
-    color: black;
-    text-align: center;
-    transition: background-color 0.3s ease;
-  }
-  button {
-    border: none;
-    border-radius: 15px;
-    padding: 8px 15px;
-    margin: 5px;
-    background-color: white;
-    color: black;
-    font-weight: bold;
-    cursor: pointer;
-  }
+  body { background-color: burlywood; font-family: "Times New Roman", serif; color: black; text-align: center; transition: background-color 0.3s ease; }
+  button { border: none; border-radius: 15px; padding: 8px 15px; margin: 5px; background-color: white; color: black; font-weight: bold; cursor: pointer; }
   #gameArea { margin-top: 20px; display: none; }
-  #sidebar {
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: 220px;
-    background: #f5deb3;
-    padding: 10px;
-    border-left: 2px solid #000;
-    height: 100%;
-    text-align: left;
-  }
-  .skill-animation {
-    font-size: 50px;
-    animation: fly 0.8s forwards;
-    position: absolute;
-    left: 50%;
-    top: 50%;
-  }
-  @keyframes fly {
-    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
-    100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; }
-  }
+  #sidebar { position: fixed; right: 0; top: 0; width: 220px; background: #f5deb3; padding: 10px; border-left: 2px solid #000; height: 100%; text-align: left; }
+  .skill-animation { font-size: 50px; animation: fly 0.8s forwards; position: absolute; left: 50%; top: 50%; }
+  @keyframes fly { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; } }
   #messages { margin-top: 10px; min-height: 24px; font-weight: bold; }
 </style>
 </head>
@@ -103,21 +70,44 @@ const charSkill = document.getElementById('charSkill');
 const walletSpan = document.getElementById('walletAddress');
 const messages = document.getElementById('messages');
 
-let provider = window.solana;
-if(!provider){ messages.innerText="Phantom Wallet not detected."; connectBtn.disabled=true; }
+// Detect Phantom
+let provider = window.solana?.isPhantom ? window.solana : null;
+if(!provider){ messages.innerText="Phantom Wallet not detected. Install Phantom!"; connectBtn.disabled=true; }
 
+// Connect Wallet
 connectBtn.onclick = async () => {
+  if(!provider){
+    // Mobile deep link
+    const phantomUrl = "https://phantom.app/ul/v1/connect?app_url=" + encodeURIComponent(window.location.href);
+    window.open(phantomUrl, "_blank");
+    return;
+  }
   try {
-    await provider.connect();
-    walletSpan.innerText = provider.publicKey.toString();
+    const resp = await provider.connect();
+    walletSpan.innerText = resp.publicKey.toString();
     connectBtn.style.display="none";
     startBtn.style.display="inline-block";
     messages.innerText="Wallet connected! Loading NFT...";
-    await loadPlayerNFT(provider.publicKey.toString());
+    await loadPlayerNFT(resp.publicKey.toString());
     messages.innerText="NFT loaded. Ready to start!";
-  } catch(e){ console.error(e); messages.innerText="Wallet connection failed.";}
+  } catch(e){
+    console.error(e);
+    messages.innerText="Wallet connection failed.";
+  }
 };
 
+// Listen for disconnect
+if(provider){
+  provider.on("connect", ()=>{ messages.innerText="Wallet connected!"; });
+  provider.on("disconnect", ()=>{
+    messages.innerText="Wallet disconnected.";
+    connectBtn.style.display="inline-block";
+    startBtn.style.display="none";
+    walletSpan.innerText="not connected";
+  });
+}
+
+// Load NFT
 async function loadPlayerNFT(walletAddress){
   const connection = new Connection(clusterApiUrl('devnet'));
   let nftArray=[];
@@ -138,11 +128,7 @@ async function loadPlayerNFT(walletAddress){
 }
 
 // ===== RPG Logic =====
-function flashBackground(color){
-  const original=document.body.style.backgroundColor;
-  document.body.style.backgroundColor=color;
-  setTimeout(()=>document.body.style.backgroundColor=original,200);
-}
+function flashBackground(color){ const original=document.body.style.backgroundColor; document.body.style.backgroundColor=color; setTimeout(()=>document.body.style.backgroundColor=original,200); }
 
 function startGame(){
   if(!playerNFT){ messages.innerText="Connect wallet and load NFT first!"; return; }
@@ -198,9 +184,7 @@ function checkGameOver(){
   }
 }
 
-function recapLog(winner){
-  console.log("=== MATCH ENDED ==="); console.log("Winner:",winner); gameLog.forEach((t,i)=>console.log(i+1+".",t));
-}
+function recapLog(winner){ console.log("=== MATCH ENDED ==="); console.log("Winner:",winner); gameLog.forEach((t,i)=>console.log(i+1+".",t)); }
 
 function playerAction(action){
   playerDefending=false;
