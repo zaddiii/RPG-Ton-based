@@ -7,159 +7,113 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NFT RPG Game - Polygon</title>
+<title>NFT RPG Game - Solana Fixed</title>
 <style>
-  body { background-color: burlywood; font-family: "Times New Roman", serif; color: black; text-align: center; transition: background-color 0.3s ease; }
-  button { border: none; border-radius: 15px; padding: 8px 15px; margin: 5px; background-color: white; color: black; font-weight: bold; cursor: pointer; }
-  #gameArea { margin-top: 20px; display: none; }
-  #sidebar { position: fixed; right: 0; top: 0; width: 220px; background: #f5deb3; padding: 10px; border-left: 2px solid #000; height: 100%; text-align: left; }
-  .skill-animation { font-size: 50px; animation: fly 0.8s forwards; position: absolute; left: 50%; top: 50%; }
-  @keyframes fly { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; } }
+  body {
+    background-color: burlywood;
+    font-family: "Times New Roman", serif;
+    color: black;
+    text-align: center;
+  }
+  button {
+    border: none;
+    border-radius: 15px;
+    padding: 8px 15px;
+    margin: 5px;
+    background-color: white;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+  }
   #messages { margin-top: 10px; min-height: 24px; font-weight: bold; }
+  #gameArea { margin-top: 20px; display: none; }
 </style>
 </head>
 <body>
 
-<h1>NFT RPG Game - Polygon</h1>
+<h1>NFT RPG Game - Solana</h1>
 
 <button id="connectBtn">Connect Wallet</button>
-<p>Wallet Address: <span id="walletAddress">not connected</span></p>
+<p>Wallet: <span id="walletAddress">not connected</span></p>
 <div id="messages"></div>
-
-<div id="sidebar">
-  <h3>Your NFT Character</h3>
-  <p>Character ID: <span id="charID">none</span></p>
-  <p>Skill: <span id="charSkill">none</span></p>
-</div>
-
-<div id="gameArea">
-  <p>Player Health: <span id="playerHealth">100</span></p>
-  <p>Player Mana: <span id="playerMana">30</span></p>
-  <p>Enemy Health: <span id="enemyHealth">100</span></p>
-  <p>Enemy Mana: <span id="enemyMana">30</span></p>
-
-  <button onclick="playerAction('Attack')">Attack</button>
-  <button onclick="playerAction('Defend')">Defend</button>
-  <button onclick="playerAction('Special')">Special (-20 MP)</button>
-  <button onclick="playerAction('Heal')">Heal (+30 HP, -10 MP)</button>
-  <button onclick="resetGame(true)">Reset Game</button>
-</div>
-
-<h2>Scoreboard</h2>
-<p>Player Wins: <span id="playerWins">0</span></p>
-<p>Enemy Wins: <span id="enemyWins">0</span></p>
 
 <button id="startGameBtn" style="display:none;">Start Game</button>
 
+<div id="gameArea">
+  <p>Player Health: <span id="playerHealth">100</span></p>
+  <p>Enemy Health: <span id="enemyHealth">100</span></p>
+  <button onclick="attack()">Attack</button>
+  <button onclick="reset()">Reset</button>
+</div>
+
 <script type="module">
+// ✅ Use clean working imports from jsDelivr
+import {
+  Connection,
+  clusterApiUrl
+} from "https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js";
 
-let playerHealth, enemyHealth, playerMana, enemyMana;
-let scores = { player:0, enemy:0 };
-let playerDefending=false, enemyDefending=false;
-let manaRegenInterval, gameLog=[];
-let playerNFT=null;
+let walletAddress = null;
+const connectBtn = document.getElementById("connectBtn");
+const walletSpan = document.getElementById("walletAddress");
+const startBtn = document.getElementById("startGameBtn");
+const msg = document.getElementById("messages");
 
-const connectBtn = document.getElementById('connectBtn');
-const startBtn = document.getElementById('startGameBtn');
-const gameArea = document.getElementById('gameArea');
-const charID = document.getElementById('charID');
-const charSkill = document.getElementById('charSkill');
-const walletSpan = document.getElementById('walletAddress');
-const messages = document.getElementById('messages');
-
-let provider = window.ethereum; // MetaMask
-
-if (!provider) {
-  messages.innerText = "MetaMask Wallet not detected!";
-  connectBtn.disabled = true;
+function showMessage(text, color="black") {
+  msg.innerText = text;
+  msg.style.color = color;
 }
 
-// ===== Connect Wallet =====
-connectBtn.onclick = async () => {
+async function connectWallet() {
   try {
-    const accounts = await provider.request({ method: 'eth_requestAccounts' });
-    const wallet = accounts[0];
-    walletSpan.innerText = wallet;
-    connectBtn.style.display = "none";
-    startBtn.style.display = "inline-block";
-    messages.innerText = "Wallet connected! Loading NFT...";
-    await loadPlayerNFT(wallet);
-    messages.innerText = "NFT loaded. Ready to start!";
-  } catch(e) {
-    console.error(e);
-    messages.innerText = "Wallet connection failed.";
-  }
-};
-
-// ===== Load Player NFT (Polygon via Alchemy) =====
-async function loadPlayerNFT(walletAddress) {
-  try {
-    const apiKey = "-GrI8qHDu3l2HlJwNLqCd"; // Your Alchemy key
-    const url = `https://polygon-mumbai.g.alchemy.com/v2/${apiKey}/getNFTs/?owner=${walletAddress}`;
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.ownedNfts && data.ownedNfts.length > 0) {
-      const nft = data.ownedNfts[0];
-      const skills = ["Thunder","Fire","Ice"];
-      let skillType = skills[Math.floor(Math.random() * 3)];
-      if (nft.metadata && nft.metadata.attributes) {
-        const attr = nft.metadata.attributes.find(a => a.trait_type === "Skill");
-        if (attr) skillType = attr.value;
-      }
-      playerNFT = { id: nft.id.tokenId, skill: skillType };
-    } else {
-      playerNFT = { id: "DEFAULT", skill: "Thunder" };
+    const provider = window.solana;
+    if (!provider || !provider.isPhantom) {
+      showMessage("Phantom Wallet not found! Install Phantom.", "red");
+      console.error("Phantom not found");
+      return;
     }
 
-    charID.innerText = playerNFT.id;
-    charSkill.innerText = playerNFT.skill;
-  } catch (e) {
-    console.error(e);
-    messages.innerText = "Failed to load NFT. Using default character.";
-    playerNFT = { id: "DEFAULT", skill: "Thunder" };
-    charID.innerText = playerNFT.id;
-    charSkill.innerText = playerNFT.skill;
+    const resp = await provider.connect();
+    walletAddress = resp.publicKey.toString();
+    walletSpan.innerText = walletAddress;
+    showMessage("✅ Wallet connected!");
+    connectBtn.style.display = "none";
+    startBtn.style.display = "inline-block";
+  } catch (err) {
+    console.error("Wallet connection error:", err);
+    showMessage("❌ Connection failed. Check Phantom or refresh.", "red");
   }
 }
 
-// ===== RPG Logic =====
-function flashBackground(color){ const o=document.body.style.backgroundColor; document.body.style.backgroundColor=color; setTimeout(()=>document.body.style.backgroundColor=o,200); }
-function startGame(){ if(!playerNFT){ messages.innerText="Connect wallet first!"; return; } resetGame(true); gameArea.style.display="block"; startBtn.style.display="none"; messages.innerText="Game started! Make your move!"; }
-function resetGame(fullReset=false){ playerHealth=100; enemyHealth=100; playerMana=30; enemyMana=30; playerDefending=false; enemyDefending=false; gameLog=[]; if(fullReset){ scores={player:0,enemy:0}; updateScoreboard(); } updateStats(); if(manaRegenInterval) clearInterval(manaRegenInterval); manaRegenInterval=setInterval(()=>{ if(playerMana<30) playerMana++; if(enemyMana<30) enemyMana++; updateStats(); },2000); }
-function updateStats(){ document.getElementById("playerHealth").innerText=playerHealth; document.getElementById("enemyHealth").innerText=enemyHealth; document.getElementById("playerMana").innerText=playerMana; document.getElementById("enemyMana").innerText=enemyMana; }
-function updateScoreboard(){ document.getElementById("playerWins").innerText=scores.player; document.getElementById("enemyWins").innerText=scores.enemy; }
-function playSkillAnimation(skill){ const anim=document.createElement("div"); anim.className="skill-animation"; anim.innerText=skill==="Thunder"?"⚡":skill==="Fire"?"🔥":"❄️"; document.body.appendChild(anim); setTimeout(()=>anim.remove(),800); }
-function logAction(text){ gameLog.push(text); messages.innerText=text; console.log(text); }
-function checkGameOver(){ if(playerHealth<=0||enemyHealth<=0){ const winner=playerHealth>0?"Player":"Enemy"; messages.innerText=`${winner} wins!`; if(winner==="Player") scores.player++; else scores.enemy++; updateScoreboard(); recapLog(winner); resetGame(false); } }
-function recapLog(winner){ console.log("=== MATCH ENDED ==="); console.log("Winner:",winner); gameLog.forEach((t,i)=>console.log(i+1+".",t)); }
-function playerAction(action){
-  playerDefending=false;
-  if(action==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; logAction(`Player attacks for ${dmg}.`); flashBackground("red"); }
-  else if(action==="Defend"){ playerDefending=true; logAction("Player defends."); flashBackground("blue"); }
-  else if(action==="Special" && playerMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(enemyDefending)dmg=Math.floor(dmg/2); enemyHealth-=dmg; playerMana-=20; playSkillAnimation(playerNFT.skill); logAction(`Player uses ${playerNFT.skill} Special for ${dmg} dmg.`); flashBackground("purple"); }
-  else if(action==="Heal" && playerMana>=10){ playerHealth=Math.min(playerHealth+30,100); playerMana-=10; logAction("Player heals +30 HP."); flashBackground("green"); }
-  else{ logAction("Not enough mana."); }
-  updateStats(); if(enemyHealth>0) setTimeout(enemyTurn,800); checkGameOver();
-}
-function enemyTurn(){
-  enemyDefending=false;
-  const skills=["Thunder","Fire","Ice"];
-  let choice;
-  if(enemyHealth<=50 && enemyMana>=10){ choice=Math.random()<0.6?"Heal":"Defend"; }
-  else if(enemyMana>=20 && Math.random()<0.5){ choice="Special"; }
-  else if(Math.random()<0.2){ choice="Defend"; }
-  else{ choice="Attack"; }
+connectBtn.addEventListener("click", connectWallet);
 
-  if(choice==="Attack"){ let dmg=Math.floor(Math.random()*10)+10; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; logAction(`Enemy attacks for ${dmg}.`); flashBackground("orange"); }
-  else if(choice==="Defend"){ enemyDefending=true; logAction("Enemy defends."); flashBackground("blue"); }
-  else if(choice==="Special" && enemyMana>=20){ let dmg=Math.floor(Math.random()*15)+25; if(playerDefending)dmg=Math.floor(dmg/2); playerHealth-=dmg; enemyMana-=20; const skill=skills[Math.floor(Math.random()*skills.length)]; playSkillAnimation(skill); logAction(`Enemy uses ${skill} Special for ${dmg} dmg.`); flashBackground("purple"); }
-  else if(choice==="Heal" && enemyMana>=10){ enemyHealth=Math.min(enemyHealth+30,100); enemyMana-=10; logAction("Enemy heals +30 HP."); flashBackground("green"); }
-  updateStats(); checkGameOver();
+startBtn.addEventListener("click", () => {
+  document.getElementById("gameArea").style.display = "block";
+  startBtn.style.display = "none";
+  showMessage("Game started!");
+});
+
+// ===== Simple Game Logic =====
+let playerHealth = 100;
+let enemyHealth = 100;
+
+function attack() {
+  const dmg = Math.floor(Math.random() * 15) + 5;
+  enemyHealth -= dmg;
+  document.getElementById("enemyHealth").innerText = enemyHealth;
+  showMessage(`You attacked enemy for ${dmg}!`);
+  if (enemyHealth <= 0) {
+    showMessage("🎉 You won!");
+  }
 }
 
-startBtn.onclick=startGame;
-
+function reset() {
+  playerHealth = 100;
+  enemyHealth = 100;
+  document.getElementById("playerHealth").innerText = playerHealth;
+  document.getElementById("enemyHealth").innerText = enemyHealth;
+  showMessage("Game reset.");
+}
 </script>
 </body>
 </html>
