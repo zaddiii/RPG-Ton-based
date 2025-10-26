@@ -7,7 +7,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NFT RPG Game - Solana Fixed</title>
+<title>NFT RPG Game - Solana Fixed (Global)</title>
 <style>
   body {
     background-color: burlywood;
@@ -46,13 +46,10 @@
   <button onclick="reset()">Reset</button>
 </div>
 
-<script type="module">
-// ✅ Use clean working imports from jsDelivr
-import {
-  Connection,
-  clusterApiUrl
-} from "https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js";
+<!-- ✅ Load the global Solana SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js"></script>
 
+<script>
 let walletAddress = null;
 const connectBtn = document.getElementById("connectBtn");
 const walletSpan = document.getElementById("walletAddress");
@@ -69,7 +66,6 @@ async function connectWallet() {
     const provider = window.solana;
     if (!provider || !provider.isPhantom) {
       showMessage("Phantom Wallet not found! Install Phantom.", "red");
-      console.error("Phantom not found");
       return;
     }
 
@@ -79,6 +75,10 @@ async function connectWallet() {
     showMessage("✅ Wallet connected!");
     connectBtn.style.display = "none";
     startBtn.style.display = "inline-block";
+
+    // ✅ You can use Solana connection here
+    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'));
+    console.log("Connected to Solana devnet:", connection);
   } catch (err) {
     console.error("Wallet connection error:", err);
     showMessage("❌ Connection failed. Check Phantom or refresh.", "red");
