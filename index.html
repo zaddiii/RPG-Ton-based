@@ -5,115 +5,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NFT RPG Game - Solana Fixed (Global)</title>
-<style>
-  body {
-    background-color: burlywood;
-    font-family: "Times New Roman", serif;
-    color: black;
-    text-align: center;
-  }
-  button {
-    border: none;
-    border-radius: 15px;
-    padding: 8px 15px;
-    margin: 5px;
-    background-color: white;
-    color: black;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  #messages { margin-top: 10px; min-height: 24px; font-weight: bold; }
-  #gameArea { margin-top: 20px; display: none; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RPG Game | Solana</title>
+  <script src="https://unpkg.com/@solana/web3.js@1.87.0/lib/index.iife.min.js"></script>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      text-align: center;
+      background: radial-gradient(circle at top, #101020, #050509);
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    button {
+      background: #14f195;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 16px;
+      margin: 10px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #0ed684;
+    }
+    #game {
+      margin-top: 20px;
+      display: none;
+      text-align: center;
+    }
+    #log {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #14f195;
+      max-width: 320px;
+      word-wrap: break-word;
+    }
+  </style>
 </head>
 <body>
+  <h1>⚔️ Solana RPG Battle ⚔️</h1>
 
-<h1>NFT RPG Game - Solana</h1>
+  <button id="connectBtn">Connect Wallet</button>
+  <div id="walletAddress"></div>
 
-<button id="connectBtn">Connect Wallet</button>
-<p>Wallet: <span id="walletAddress">not connected</span></p>
-<div id="messages"></div>
+  <div id="game">
+    <h2>Battle Arena</h2>
+    <p>Your SOL Balance: <span id="balance">-</span></p>
+    <button id="attackBtn">⚔️ Attack</button>
+    <button id="defendBtn">🛡️ Defend</button>
+    <p id="result"></p>
+    <p id="log"></p>
+  </div>
 
-<button id="startGameBtn" style="display:none;">Start Game</button>
+  <script>
+    const connectBtn = document.getElementById('connectBtn');
+    const walletAddress = document.getElementById('walletAddress');
+    const gameSection = document.getElementById('game');
+    const balanceField = document.getElementById('balance');
+    const result = document.getElementById('result');
+    const log = document.getElementById('log');
 
-<div id="gameArea">
-  <p>Player Health: <span id="playerHealth">100</span></p>
-  <p>Enemy Health: <span id="enemyHealth">100</span></p>
-  <button onclick="attack()">Attack</button>
-  <button onclick="reset()">Reset</button>
-</div>
+    const connection = new solanaWeb3.Connection(
+      solanaWeb3.clusterApiUrl('devnet'),
+      'confirmed'
+    );
 
-<!-- ✅ Load the global Solana SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.78.0/lib/index.iife.min.js"></script>
+    let provider = null;
+    let publicKey = null;
 
-<script>
-let walletAddress = null;
-const connectBtn = document.getElementById("connectBtn");
-const walletSpan = document.getElementById("walletAddress");
-const startBtn = document.getElementById("startGameBtn");
-const msg = document.getElementById("messages");
-
-function showMessage(text, color="black") {
-  msg.innerText = text;
-  msg.style.color = color;
-}
-
-async function connectWallet() {
-  try {
-    const provider = window.solana;
-    if (!provider || !provider.isPhantom) {
-      showMessage("Phantom Wallet not found! Install Phantom.", "red");
-      return;
+    // 🟢 Detect Phantom
+    function getProvider() {
+      if ('solana' in window) {
+        const sol = window.solana;
+        if (sol.isPhantom) return sol;
+      }
+      window.open('https://phantom.app/', '_blank');
     }
 
-    const resp = await provider.connect();
-    walletAddress = resp.publicKey.toString();
-    walletSpan.innerText = walletAddress;
-    showMessage("✅ Wallet connected!");
-    connectBtn.style.display = "none";
-    startBtn.style.display = "inline-block";
+    // 🔗 Connect wallet
+    connectBtn.onclick = async () => {
+      provider = getProvider();
+      if (!provider) {
+        alert('Phantom not found!');
+        return;
+      }
 
-    // ✅ You can use Solana connection here
-    const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'));
-    console.log("Connected to Solana devnet:", connection);
-  } catch (err) {
-    console.error("Wallet connection error:", err);
-    showMessage("❌ Connection failed. Check Phantom or refresh.", "red");
-  }
-}
+      try {
+        const res = await provider.connect();
+        publicKey = res.publicKey.toString();
+        walletAddress.textContent = `Connected: ${publicKey}`;
+        connectBtn.style.display = 'none';
+        gameSection.style.display = 'block';
+        getBalance();
+      } catch (err) {
+        console.error(err);
+        alert('Connection failed.');
+      }
+    };
 
-connectBtn.addEventListener("click", connectWallet);
+    // 💰 Get balance
+    async function getBalance() {
+      try {
+        const balance = await connection.getBalance(
+          new solanaWeb3.PublicKey(publicKey)
+        );
+        balanceField.textContent = (balance / solanaWeb3.LAMPORTS_PER_SOL).toFixed(3);
+      } catch (err) {
+        console.error(err);
+        balanceField.textContent = 'Error';
+      }
+    }
 
-startBtn.addEventListener("click", () => {
-  document.getElementById("gameArea").style.display = "block";
-  startBtn.style.display = "none";
-  showMessage("Game started!");
-});
+    // ⚔️ Game Logic
+    document.getElementById('attackBtn').onclick = async () => {
+      const outcome = Math.random() < 0.5 ? 'Victory!' : 'Defeat!';
+      result.textContent = outcome;
+      if (outcome === 'Victory!') await simulateReward();
+      logMessage('Attack executed!');
+    };
 
-// ===== Simple Game Logic =====
-let playerHealth = 100;
-let enemyHealth = 100;
+    document.getElementById('defendBtn').onclick = () => {
+      const defense = Math.random() < 0.7 ? 'Successful Block!' : 'Failed Defense!';
+      result.textContent = defense;
+      logMessage('Defense move made!');
+    };
 
-function attack() {
-  const dmg = Math.floor(Math.random() * 15) + 5;
-  enemyHealth -= dmg;
-  document.getElementById("enemyHealth").innerText = enemyHealth;
-  showMessage(`You attacked enemy for ${dmg}!`);
-  if (enemyHealth <= 0) {
-    showMessage("🎉 You won!");
-  }
-}
+    // 💎 Simulate reward transaction (fake)
+    async function simulateReward() {
+      try {
+        const tx = new solanaWeb3.Transaction().add(
+          solanaWeb3.SystemProgram.transfer({
+            fromPubkey: new solanaWeb3.PublicKey(publicKey),
+            toPubkey: new solanaWeb3.PublicKey(publicKey),
+            lamports: 0, // fake transaction
+          })
+        );
+        logMessage('Reward simulated (no actual SOL sent).');
+      } catch (err) {
+        console.error(err);
+        logMessage('Reward failed.');
+      }
+    }
 
-function reset() {
-  playerHealth = 100;
-  enemyHealth = 100;
-  document.getElementById("playerHealth").innerText = playerHealth;
-  document.getElementById("enemyHealth").innerText = enemyHealth;
-  showMessage("Game reset.");
-}
-</script>
+    function logMessage(msg) {
+      log.textContent = msg;
+    }
+  </script>
 </body>
 </html>
