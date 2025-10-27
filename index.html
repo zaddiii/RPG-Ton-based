@@ -1,30 +1,104 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TON Connect Test</title>
-  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-</head>
-<body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RPG TON Battle Arena</title>
 
-  <h2>TON Wallet Connect Test</h2>
+  <!-- TON Connect UI -->
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+
+  <!-- TON SDKs -->
+  <script src="https://unpkg.com/@tonconnect/sdk@2.1.1/dist/tonconnect-sdk.min.js"></script>
+  <script src="https://unpkg.com/tonweb@0.0.67/dist/tonweb.min.js"></script>
+
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: sans-serif;
+      background: #0d1117;
+      color: #fff;
+    }
+    #connect {
+      margin-bottom: 20px;
+    }
+    button {
+      background: #007bff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #walletInfo {
+      margin-top: 20px;
+      text-align: center;
+      word-break: break-all;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>🎮 RPG TON Battle Arena</h2>
   <div id="connect"></div>
+
+  <div id="walletInfo"></div>
+
+  <button id="checkNFTs" style="display:none;">Scan for NFTs</button>
+  <button id="claimReward" style="display:none;">Claim 100 RPG Tokens</button>
 
   <script type="module">
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
     });
 
+    // Setup button placement
     tonConnectUI.uiOptions = {
-      language: 'en',
+      language: "en",
       buttonRootId: "connect"
     };
-  </script>
 
+    // Handle connection
+    tonConnectUI.onStatusChange(async (walletInfo) => {
+      const infoDiv = document.getElementById("walletInfo");
+      const nftBtn = document.getElementById("checkNFTs");
+      const rewardBtn = document.getElementById("claimReward");
+
+      if (walletInfo && walletInfo.account) {
+        const address = walletInfo.account.address;
+        infoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${address}</p>`;
+        nftBtn.style.display = "inline-block";
+        rewardBtn.style.display = "inline-block";
+      } else {
+        infoDiv.innerHTML = `<p>🔴 Wallet not connected</p>`;
+        nftBtn.style.display = "none";
+        rewardBtn.style.display = "none";
+      }
+    });
+
+    // --- NFT SCAN MOCK ---
+    document.getElementById("checkNFTs").addEventListener("click", async () => {
+      alert("🔍 Scanning for NFTs... (simulation)");
+      // Here we’ll later connect TonWeb NFT collection scan logic
+    });
+
+    // --- REWARD TOKEN MOCK ---
+    document.getElementById("claimReward").addEventListener("click", async () => {
+      const connectedWallet = await tonConnectUI.getWallet();
+      if (!connectedWallet) return alert("Please connect your wallet first!");
+
+      // Mock simulation of sending RPG tokens
+      alert("🏆 You won! Sending 100 RPG tokens (Testnet Simulation).");
+      // Later this will trigger a Jetton Transfer on TON
+    });
+  </script>
 </body>
 </html>
