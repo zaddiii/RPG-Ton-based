@@ -2,235 +2,113 @@
 
 
 
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <title>RPG × Solana NFT Boost</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TON RPG Battle Arena</title>
+
+  <!-- TON Connect UI library -->
+  <script type="module" src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+
   <style>
     body {
-      background-color: burlywood;
-      font-family: "Times New Roman", serif;
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(135deg, #e03c3c, #ff7b00);
+      color: #fff;
       text-align: center;
-      color: black;
+      padding: 40px;
     }
-    button {
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+    }
+
+    p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    #connectButton {
+      margin-top: 30px;
+      display: inline-block;
+      background-color: #0088cc;
+      color: #fff;
       border: none;
-      border-radius: 15px;
-      padding: 8px 15px;
-      margin: 5px;
-      background-color: white;
-      font-weight: bold;
+      border-radius: 10px;
+      padding: 12px 25px;
+      font-size: 16px;
       cursor: pointer;
+      transition: background 0.3s ease;
     }
+
+    #connectButton:hover {
+      background-color: #00aaff;
+    }
+
     #walletAddress {
-      font-size: 14px;
-      font-weight: bold;
-      margin: 10px;
+      margin-top: 20px;
+      font-size: 1rem;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px;
+      display: inline-block;
+    }
+
+    footer {
+      margin-top: 50px;
+      font-size: 0.9rem;
+      opacity: 0.8;
     }
   </style>
 </head>
+
 <body>
-  <h1>RPG × Solana ⚔️</h1>
+  <h1>⚔️ TON RPG Battle Arena</h1>
+  <p>Connect your TON wallet to enter the arena and battle fearsome enemies!</p>
 
-  <!-- Wallet Connect -->
-  <div id="walletConnect">
-    <button id="connectWallet">🔗 Connect Phantom Wallet</button>
-    <p id="walletAddress"></p>
-  </div>
+  <!-- The TON Connect UI container -->
+  <div id="connectButton"></div>
 
-  <!-- Game Area -->
-  <div id="gameArea" style="display:none;">
-    <p>Player Health: <span id="playerHealth">100</span></p>
-    <p>Player Mana: <span id="playerMana">30</span></p>
-    <p>Enemy Health: <span id="enemyHealth">100</span></p>
-    <p>Enemy Mana: <span id="enemyMana">30</span></p>
-    <button onclick="playerAction('Attack')">Attack</button>
-    <button onclick="playerAction('Defend')">Defend</button>
-    <button onclick="playerAction('Special')">Special (-20 MP)</button>
-    <button onclick="playerAction('Heal')">Heal (+30 HP, -10 MP)</button>
-    <button onclick="resetGame(true)">Reset Game</button>
+  <div id="walletAddress">Wallet: not connected</div>
 
-    <h2>Scoreboard</h2>
-    <p>Player Wins: <span id="playerWins">0</span></p>
-    <p>Enemy Wins: <span id="enemyWins">0</span></p>
-  </div>
+  <footer>
+    <p>Powered by <strong>TON Blockchain</strong> 🌀</p>
+  </footer>
 
-  <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
-  <script>
-    const { Connection, clusterApiUrl } = solanaWeb3;
-    const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
-    let walletAddress = null;
-    let nftPowerBoost = false;
+  <script type="module">
+    import { TonConnectUI } from "https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js";
 
-    async function connectWallet() {
-      if (window.solana && window.solana.isPhantom) {
-        try {
-          const response = await window.solana.connect();
-          walletAddress = response.publicKey.toString();
-          document.getElementById("walletAddress").innerText =
-            "Connected: " + walletAddress.slice(0, 6) + "..." + walletAddress.slice(-4);
+    const tonConnectUI = new TonConnectUI({
+      manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
+    });
 
-          alert("Wallet connected. Checking NFT ownership...");
+    // Button
+    tonConnectUI.uiOptions = {
+      language: "en",
+      walletsList: { includeWallets: ["tonkeeper", "tonhub"] }
+    };
 
-          // ✅ Check NFTs
-          await checkNFTs(walletAddress);
+    // Listen for connection
+    tonConnectUI.onStatusChange((walletInfo) => {
+      const walletDisplay = document.getElementById("walletAddress");
 
-          document.getElementById("walletConnect").style.display = "none";
-          document.getElementById("gameArea").style.display = "block";
-          resetGame(true);
-
-          alert(nftPowerBoost
-            ? "Arena Badge detected — Power Boost Activated! ⚡"
-            : "No Arena Badge NFT found — Normal mode enabled.");
-
-        } catch (err) {
-          console.error("Wallet connection failed:", err);
-        }
+      if (walletInfo && walletInfo.account && walletInfo.account.address) {
+        walletDisplay.innerHTML = `Wallet: <b>${walletInfo.account.address}</b>`;
+        alert("✅ Wallet connected successfully!");
+        // You can now initialize your game logic here (show RPG game UI)
       } else {
-        alert("Phantom Wallet not found. Install Phantom extension.");
+        walletDisplay.textContent = "Wallet: not connected";
       }
-    }
+    });
 
-    document.getElementById("connectWallet").addEventListener("click", connectWallet);
-
-    // === NFT CHECK ===
-    async function checkNFTs(address) {
-      try {
-        const url = `https://api-mainnet.magiceden.dev/v2/wallets/${address}/tokens?offset=0&limit=10`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        // Check for "Arena Badge" or any NFT with matching name
-        nftPowerBoost = data.some(
-          nft =>
-            nft?.collection?.toLowerCase()?.includes("arena") ||
-            nft?.name?.toLowerCase()?.includes("badge")
-        );
-      } catch (error) {
-        console.error("Error checking NFTs:", error);
-        nftPowerBoost = false;
-      }
-    }
-
-    // === GAME LOGIC ===
-    let playerHealth, enemyHealth, playerMana, enemyMana;
-    let scores = { player: 0, enemy: 0 };
-    let playerDefending = false;
-    let enemyDefending = false;
-    let manaRegenInterval;
-
-    function resetGame(fullReset = false) {
-      playerHealth = nftPowerBoost ? 120 : 100;
-      enemyHealth = 100;
-      playerMana = 30;
-      enemyMana = 30;
-      playerDefending = false;
-      enemyDefending = false;
-
-      if (fullReset) scores = { player: 0, enemy: 0 };
-      updateStats();
-
-      if (manaRegenInterval) clearInterval(manaRegenInterval);
-      manaRegenInterval = setInterval(() => {
-        if (playerMana < 30) playerMana++;
-        if (enemyMana < 30) enemyMana++;
-        updateStats();
-      }, 2000);
-    }
-
-    function updateStats() {
-      document.getElementById("playerHealth").innerText = playerHealth;
-      document.getElementById("enemyHealth").innerText = enemyHealth;
-      document.getElementById("playerMana").innerText = playerMana;
-      document.getElementById("enemyMana").innerText = enemyMana;
-    }
-
-    function updateScoreboard() {
-      document.getElementById("playerWins").innerText = scores.player;
-      document.getElementById("enemyWins").innerText = scores.enemy;
-    }
-
-    function playerAction(action) {
-      playerDefending = false;
-      let dmg;
-
-      if (action === "Attack") {
-        dmg = Math.floor(Math.random() * 10) + 10;
-        if (enemyDefending) dmg = Math.floor(dmg / 2);
-        if (nftPowerBoost) dmg = Math.floor(dmg * 1.2);
-        enemyHealth -= dmg;
-        alert(`You attacked for ${dmg}!`);
-      } else if (action === "Defend") {
-        playerDefending = true;
-        alert("You defend this turn.");
-      } else if (action === "Special" && playerMana >= 20) {
-        dmg = Math.floor(Math.random() * 15) + 25;
-        if (enemyDefending) dmg = Math.floor(dmg / 2);
-        if (nftPowerBoost) dmg = Math.floor(dmg * 1.2);
-        enemyHealth -= dmg;
-        playerMana -= 20;
-        alert(`You used Special! Enemy takes ${dmg} damage!`);
-      } else if (action === "Heal" && playerMana >= 10) {
-        let heal = nftPowerBoost ? 40 : 30;
-        playerHealth = Math.min(playerHealth + heal, 120);
-        playerMana -= 10;
-        alert(`You healed +${heal} HP!`);
-      } else {
-        alert("Not enough mana!");
-      }
-
-      updateStats();
-      checkGameOver();
-      if (enemyHealth > 0) setTimeout(enemyTurn, 800);
-    }
-
-    function enemyTurn() {
-      enemyDefending = false;
-      let c;
-      if (enemyHealth <= 50 && enemyMana >= 10) c = Math.random() < 0.6 ? "Heal" : "Defend";
-      else if (enemyMana >= 20 && Math.random() < 0.5) c = "Special";
-      else if (Math.random() < 0.2) c = "Defend";
-      else c = "Attack";
-
-      let dmg;
-
-      if (c === "Attack") {
-        dmg = Math.floor(Math.random() * 10) + 10;
-        if (playerDefending) dmg = Math.floor(dmg / 2);
-        playerHealth -= dmg;
-        alert(`Enemy attacks for ${dmg}!`);
-      } else if (c === "Defend") {
-        enemyDefending = true;
-        alert("Enemy defends.");
-      } else if (c === "Special" && enemyMana >= 20) {
-        dmg = Math.floor(Math.random() * 15) + 25;
-        if (playerDefending) dmg = Math.floor(dmg / 2);
-        playerHealth -= dmg;
-        enemyMana -= 20;
-        alert(`Enemy Special → ${dmg} damage!`);
-      } else if (c === "Heal" && enemyMana >= 10) {
-        enemyHealth = Math.min(enemyHealth + 30, 100);
-        enemyMana -= 10;
-        alert("Enemy heals +30 HP!");
-      }
-
-      updateStats();
-      checkGameOver();
-    }
-
-    function checkGameOver() {
-      if (playerHealth <= 0) {
-        alert("You Lose!");
-        scores.enemy++;
-        updateScoreboard();
-        resetGame();
-      } else if (enemyHealth <= 0) {
-        alert("You Win!");
-        scores.player++;
-        updateScoreboard();
-        resetGame();
-      }
-    }
+    // Render TON Connect button
+    tonConnectUI.renderButton("#connectButton", {
+      theme: "dark",
+      size: "m"
+    });
   </script>
 </body>
 </html>
