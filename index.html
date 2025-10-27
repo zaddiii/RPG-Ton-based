@@ -5,110 +5,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TON RPG Battle Arena</title>
-
-  <!-- TON Connect UI library -->
-  <script type="module" src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-
-  <style>
-    body {
-      font-family: "Poppins", sans-serif;
-      background: linear-gradient(135deg, #e03c3c, #ff7b00);
-      color: #fff;
-      text-align: center;
-      padding: 40px;
-    }
-
-    h1 {
-      font-size: 2rem;
-      margin-bottom: 10px;
-    }
-
-    p {
-      font-size: 1.1rem;
-      opacity: 0.9;
-    }
-
-    #connectButton {
-      margin-top: 30px;
-      display: inline-block;
-      background-color: #0088cc;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 12px 25px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-
-    #connectButton:hover {
-      background-color: #00aaff;
-    }
-
-    #walletAddress {
-      margin-top: 20px;
-      font-size: 1rem;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 10px;
-      display: inline-block;
-    }
-
-    footer {
-      margin-top: 50px;
-      font-size: 0.9rem;
-      opacity: 0.8;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TON Connect Test</title>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 </head>
+<body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
 
-<body>
-  <h1>⚔️ TON RPG Battle Arena</h1>
-  <p>Connect your TON wallet to enter the arena and battle fearsome enemies!</p>
-
-  <!-- The TON Connect UI container -->
-  <div id="connectButton"></div>
-
-  <div id="walletAddress">Wallet: not connected</div>
-
-  <footer>
-    <p>Powered by <strong>TON Blockchain</strong> 🌀</p>
-  </footer>
+  <h2>TON Wallet Connect Test</h2>
+  <div id="connect"></div>
 
   <script type="module">
-    import { TonConnectUI } from "https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js";
-
-    const tonConnectUI = new TonConnectUI({
+    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
     });
 
-    // Button
     tonConnectUI.uiOptions = {
-      language: "en",
-      walletsList: { includeWallets: ["tonkeeper", "tonhub"] }
+      language: 'en',
+      buttonRootId: "connect"
     };
-
-    // Listen for connection
-    tonConnectUI.onStatusChange((walletInfo) => {
-      const walletDisplay = document.getElementById("walletAddress");
-
-      if (walletInfo && walletInfo.account && walletInfo.account.address) {
-        walletDisplay.innerHTML = `Wallet: <b>${walletInfo.account.address}</b>`;
-        alert("✅ Wallet connected successfully!");
-        // You can now initialize your game logic here (show RPG game UI)
-      } else {
-        walletDisplay.textContent = "Wallet: not connected";
-      }
-    });
-
-    // Render TON Connect button
-    tonConnectUI.renderButton("#connectButton", {
-      theme: "dark",
-      size: "m"
-    });
   </script>
+
 </body>
 </html>
