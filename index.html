@@ -1,104 +1,263 @@
 
 
 
-<!DOCTYPE html>
+
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RPG TON Battle Arena</title>
-
-  <!-- TON Connect UI -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RPG TON Battle Arena — Claim Reward</title>
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-
-  <!-- TON SDKs -->
-  <script src="https://unpkg.com/@tonconnect/sdk@2.1.1/dist/tonconnect-sdk.min.js"></script>
-  <script src="https://unpkg.com/tonweb@0.0.67/dist/tonweb.min.js"></script>
-
   <style>
     body {
+      font-family: system-ui, sans-serif;
+      background: #f6ecd7;
+      color: #111;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      height: 100vh;
-      font-family: sans-serif;
-      background: #0d1117;
-      color: #fff;
+      padding: 36px;
     }
-    #connect {
-      margin-bottom: 20px;
-    }
+    #connectRoot { margin-bottom: 10px; }
     button {
-      background: #007bff;
+      padding: 10px 16px;
+      border-radius: 10px;
       border: none;
-      padding: 10px 18px;
-      border-radius: 8px;
+      background: #0b67ff;
       color: #fff;
       cursor: pointer;
-      font-size: 16px;
+      margin: 8px;
     }
-    #walletInfo {
-      margin-top: 20px;
-      text-align: center;
-      word-break: break-all;
-    }
+    #messages { margin-top: 12px; min-height: 20px; font-weight: 600; color: #333; }
+    #wallet { word-break: break-all; color: #0b67ff; }
   </style>
 </head>
-
 <body>
-  <h2>🎮 RPG TON Battle Arena</h2>
-  <div id="connect"></div>
+  <h1>RPG TON Battle Arena</h1>
 
-  <div id="walletInfo"></div>
+  <div id="connectRoot"></div>
+  <div>Connected wallet: <span id="wallet">not connected</span></div>
+  <div id="messages"></div>
 
-  <button id="checkNFTs" style="display:none;">Scan for NFTs</button>
-  <button id="claimReward" style="display:none;">Claim 100 RPG Tokens</button>
+  <div style="margin-top:18px;">
+    <button id="claimBtn" disabled>Claim 50 RPG (DevNet)</button>
+  </div>
 
-  <script type="module">
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-      manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
-    });
+<script type="module">
+(async () => {
 
-    // Setup button placement
-    tonConnectUI.uiOptions = {
-      language: "en",
-      buttonRootId: "connect"
-    };
+  // ✅ BACKEND URL – Updated to your real deployed endpoint
+  const BACKEND_REWARD_URL = "https://ton-reward-server.vercel.app/api/reward-api";
+  const REWARD_AMOUNT = 50; // tokens to send
 
-    // Handle connection
-    tonConnectUI.onStatusChange(async (walletInfo) => {
-      const infoDiv = document.getElementById("walletInfo");
-      const nftBtn = document.getElementById("checkNFTs");
-      const rewardBtn = document.getElementById("claimReward");
+  // --- TonConnect UI Setup ---
+  if (!window.TON_CONNECT_UI) {
+    document.getElementById('messages').innerText = "TonConnect UI library failed to load — check your network.";
+    return;
+  }
 
-      if (walletInfo && walletInfo.account) {
-        const address = walletInfo.account.address;
-        infoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${address}</p>`;
-        nftBtn.style.display = "inline-block";
-        rewardBtn.style.display = "inline-block";
-      } else {
-        infoDiv.innerHTML = `<p>🔴 Wallet not connected</p>`;
-        nftBtn.style.display = "none";
-        rewardBtn.style.display = "none";
+  const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+    manifestUrl: window.location.origin + "/tonconnect-manifest.json",
+    buttonRootId: "connectRoot"
+  });
+
+  // Attempt to render wallet button
+  try { tonConnectUI.render?.(); } catch (e) {}
+
+  const walletSpan = document.getElementById("wallet");
+  const messages = document.getElementById("messages");
+  const claimBtn = document.getElementById("claimBtn");
+
+  // Helper to safely get connected wallet address
+  function getConnectedAddress() {
+    try {
+      if (tonConnectUI.account?.address) return tonConnectUI.account.address;
+      if (tonConnectUI.connector?.account?.address) return tonConnectUI.connector.account.address;
+      if (tonConnectUI.connectedWallet?.account?.address) return tonConnectUI.connectedWallet.account.address;
+    } catch (e) {}
+    return null;
+  }
+
+  // Poll connection status
+  setInterval(() => {
+    const address = getConnectedAddress();
+    walletSpan.innerText = address || "not connected";
+    claimBtn.disabled = !address;
+  }, 800);
+
+  // --- Claim Button Logic ---
+  claimBtn.onclick = async () => {
+    const address = getConnectedAddress();
+    if (!address) {
+      alert("Please connect your wallet first.");
+      return;
+    }
+
+    if (!confirm(`You will receive ${REWARD_AMOUNT} RPG tokens to ${address} (DevNet). Proceed?`)) return;
+
+    messages.innerText = "Requesting reward from server...";
+
+    try {
+      const res = await fetch(BACKEND_REWARD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: address, amount: REWARD_AMOUNT })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        messages.innerText = `Server error: ${res.status} ${res.statusText}`;
+        alert("Reward failed — check Vercel logs for details.");
+        return;
       }
-    });
 
-    // --- NFT SCAN MOCK ---
-    document.getElementById("checkNFTs").addEventListener("click", async () => {
-      alert("🔍 Scanning for NFTs... (simulation)");
-      // Here we’ll later connect TonWeb NFT collection scan logic
-    });
+      if (data.ok) {
+        messages.innerText = `✅ Reward accepted — tx: ${data.tx}`;
+        alert(`Success — reward request accepted!\nServer tx: ${data.tx}`);
+      } else {
+        messages.innerText = `❌ Server returned error: ${data.error || "unknown"}`;
+        alert(`Server returned error: ${data.error || "unknown"}`);
+      }
 
-    // --- REWARD TOKEN MOCK ---
-    document.getElementById("claimReward").addEventListener("click", async () => {
-      const connectedWallet = await tonConnectUI.getWallet();
-      if (!connectedWallet) return alert("Please connect your wallet first!");
+    } catch (err) {
+      console.error(err);
+      messages.innerText = "Network error — unable to reach reward server.";
+      alert("Network error — check your connection or backend URL.");
+    }
+  };
 
-      // Mock simulation of sending RPG tokens
-      alert("🏆 You won! Sending 100 RPG tokens (Testnet Simulation).");
-      // Later this will trigger a Jetton Transfer on TON
-    });
-  </script>
+})();
+</script>
+</body>
+</html><!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RPG TON Battle Arena — Claim Reward</title>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f6ecd7;
+      color: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 36px;
+    }
+    #connectRoot { margin-bottom: 10px; }
+    button {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: none;
+      background: #0b67ff;
+      color: #fff;
+      cursor: pointer;
+      margin: 8px;
+    }
+    #messages { margin-top: 12px; min-height: 20px; font-weight: 600; color: #333; }
+    #wallet { word-break: break-all; color: #0b67ff; }
+  </style>
+</head>
+<body>
+  <h1>RPG TON Battle Arena</h1>
+
+  <div id="connectRoot"></div>
+  <div>Connected wallet: <span id="wallet">not connected</span></div>
+  <div id="messages"></div>
+
+  <div style="margin-top:18px;">
+    <button id="claimBtn" disabled>Claim 50 RPG (DevNet)</button>
+  </div>
+
+<script type="module">
+(async () => {
+
+  // ✅ BACKEND URL – Updated to your real deployed endpoint
+  const BACKEND_REWARD_URL = "https://ton-reward-server.vercel.app/api/reward-api";
+  const REWARD_AMOUNT = 50; // tokens to send
+
+  // --- TonConnect UI Setup ---
+  if (!window.TON_CONNECT_UI) {
+    document.getElementById('messages').innerText = "TonConnect UI library failed to load — check your network.";
+    return;
+  }
+
+  const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+    manifestUrl: window.location.origin + "/tonconnect-manifest.json",
+    buttonRootId: "connectRoot"
+  });
+
+  // Attempt to render wallet button
+  try { tonConnectUI.render?.(); } catch (e) {}
+
+  const walletSpan = document.getElementById("wallet");
+  const messages = document.getElementById("messages");
+  const claimBtn = document.getElementById("claimBtn");
+
+  // Helper to safely get connected wallet address
+  function getConnectedAddress() {
+    try {
+      if (tonConnectUI.account?.address) return tonConnectUI.account.address;
+      if (tonConnectUI.connector?.account?.address) return tonConnectUI.connector.account.address;
+      if (tonConnectUI.connectedWallet?.account?.address) return tonConnectUI.connectedWallet.account.address;
+    } catch (e) {}
+    return null;
+  }
+
+  // Poll connection status
+  setInterval(() => {
+    const address = getConnectedAddress();
+    walletSpan.innerText = address || "not connected";
+    claimBtn.disabled = !address;
+  }, 800);
+
+  // --- Claim Button Logic ---
+  claimBtn.onclick = async () => {
+    const address = getConnectedAddress();
+    if (!address) {
+      alert("Please connect your wallet first.");
+      return;
+    }
+
+    if (!confirm(`You will receive ${REWARD_AMOUNT} RPG tokens to ${address} (DevNet). Proceed?`)) return;
+
+    messages.innerText = "Requesting reward from server...";
+
+    try {
+      const res = await fetch(BACKEND_REWARD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: address, amount: REWARD_AMOUNT })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        messages.innerText = `Server error: ${res.status} ${res.statusText}`;
+        alert("Reward failed — check Vercel logs for details.");
+        return;
+      }
+
+      if (data.ok) {
+        messages.innerText = `✅ Reward accepted — tx: ${data.tx}`;
+        alert(`Success — reward request accepted!\nServer tx: ${data.tx}`);
+      } else {
+        messages.innerText = `❌ Server returned error: ${data.error || "unknown"}`;
+        alert(`Server returned error: ${data.error || "unknown"}`);
+      }
+
+    } catch (err) {
+      console.error(err);
+      messages.innerText = "Network error — unable to reach reward server.";
+      alert("Network error — check your connection or backend URL.");
+    }
+  };
+
+})();
+</script>
 </body>
 </html>
