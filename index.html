@@ -2,21 +2,27 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RPG TON Battle Arena v2</title>
 <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 <style>
   body {
-    background-color: burlywood;
-    font-family: "Times New Roman", serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: sans-serif;
+    background: burlywood;
     color: black;
     text-align: center;
-    transition: background-color 0.3s ease;
+    padding: 20px;
   }
+  #connect { margin-bottom: 20px; }
+  #walletInfo { margin-bottom: 20px; word-break: break-all; }
   #gameArea button,
   .startbutton {
     border: none;
@@ -29,12 +35,12 @@
     cursor: pointer;
   }
   #gameArea { margin-top: 20px; display: none; }
-  #connectRoot { margin: 20px 0; }
 </style>
 </head>
 <body>
-<h1 class="heading1">🎮 RPG TON Battle Arena v2</h1>
-<div id="connectRoot"></div>
+
+<h1>🎮 RPG TON Battle Arena</h1>
+<div id="connect"></div>
 <div id="walletInfo">🔴 Wallet not connected</div>
 
 <div id="gameArea">
@@ -43,7 +49,6 @@
   <p>Enemy Health: <span id="enemyHealth">100</span></p>
   <p>Enemy Mana: <span id="enemyMana">30</span></p>
 
-  <!-- Player buttons -->
   <button onclick="playerAction('Attack')">Attack</button>
   <button onclick="playerAction('Defend')">Defend</button>
   <button onclick="playerAction('Special')">Special (-20 MP)</button>
@@ -66,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- TON CONNECT ---
   const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
     manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json",
-    uiOptions: { buttonRootId: "connectRoot" }
+    uiOptions: { buttonRootId: "connect" }
   });
   tonConnectUI.render?.();
 
@@ -93,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(updateUI, 700);
   tonConnectUI.onStatusChange(updateUI);
 
-  // --- GAME LOGIC ---
+  // --- RPG GAME LOGIC ---
   let playerHealth, enemyHealth, playerMana, enemyMana;
   let scores = { player: 0, enemy: 0 };
   let playerDefending = false;
@@ -106,7 +111,6 @@ document.addEventListener("DOMContentLoaded", () => {
     gameArea.style.display = "block";
     startButton.style.display = "none";
     alert("Welcome to the Arena ⚔️!");
-    console.log("=== New Game Started ===");
   }
 
   function resetGame(fullReset = false) {
@@ -117,7 +121,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (fullReset) { scores = { player: 0, enemy: 0 }; updateScoreboard(); }
 
     updateStats();
-    console.log("Game reset: Player HP 100/MP 30 | Enemy HP 100/MP 30");
 
     if (manaRegenInterval) clearInterval(manaRegenInterval);
     manaRegenInterval = setInterval(() => {
@@ -140,20 +143,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function logAction(text) { gameLog.push(text); console.log(text); }
-
-  function recapLog(winner) {
-    console.log("=== MATCH ENDED ===");
-    console.log("Winner: " + winner);
-    console.log("----- Full Recap -----");
-    gameLog.forEach((entry, i) => console.log((i+1) + ". " + entry));
-    console.log("======================");
-  }
+  function recapLog(winner) { console.log("=== MATCH ENDED ==="); console.log("Winner: " + winner); gameLog.forEach((e,i)=>console.log((i+1)+". "+e)); }
 
   function playerAction(action) {
     playerDefending = false;
     if (action === "Attack") {
       let dmg = Math.floor(Math.random() * 10) + 10;
-      if (enemyDefending) dmg = Math.floor(dmg / 2);
+      if (enemyDefending) dmg = Math.floor(dmg/2);
       enemyHealth -= dmg;
       alert(`You attacked for ${dmg}!`);
       logAction(`Player attacks for ${dmg}.`);
@@ -163,62 +159,40 @@ document.addEventListener("DOMContentLoaded", () => {
       logAction("Player defends.");
     } else if (action === "Special" && playerMana >= 20) {
       let dmg = Math.floor(Math.random() * 15) + 25;
-      if (enemyDefending) dmg = Math.floor(dmg / 2);
+      if (enemyDefending) dmg = Math.floor(dmg/2);
       enemyHealth -= dmg; playerMana -= 20;
       alert(`You used a Special Attack! Enemy takes ${dmg} damage!`);
       logAction(`Player uses Special → ${dmg} dmg, -20 MP.`);
     } else if (action === "Heal" && playerMana >= 10) {
-      playerHealth = Math.min(playerHealth + 30, 100);
-      playerMana -= 10;
+      playerHealth = Math.min(playerHealth+30,100); playerMana -= 10;
       alert("You healed for 30 HP!");
       logAction("Player heals +30 HP, -10 MP.");
     } else {
       alert("Not enough mana!");
       logAction("Failed action: Not enough mana.");
     }
-    updateStats();
-    checkGameOver();
+    updateStats(); checkGameOver();
     if (enemyHealth > 0) setTimeout(enemyTurn, 800);
   }
 
   function enemyTurn() {
     enemyDefending = false;
     let choice;
-    if (enemyHealth <= 50 && enemyMana >= 10) choice = Math.random() < 0.6 ? "Heal" : "Defend";
-    else if (enemyMana >= 20 && Math.random() < 0.5) choice = "Special";
-    else if (Math.random() < 0.2) choice = "Defend";
-    else choice = "Attack";
+    if (enemyHealth <= 50 && enemyMana >= 10) choice = Math.random()<0.6?"Heal":"Defend";
+    else if (enemyMana >= 20 && Math.random()<0.5) choice="Special";
+    else if (Math.random()<0.2) choice="Defend";
+    else choice="Attack";
 
-    if (choice === "Attack") {
-      let dmg = Math.floor(Math.random() * 10) + 10;
-      if (playerDefending) dmg = Math.floor(dmg / 2);
-      playerHealth -= dmg;
-      alert(`Enemy attacks you for ${dmg}!`);
-      logAction(`Enemy attacks for ${dmg}.`);
-    } else if (choice === "Defend") { enemyDefending = true; alert("Enemy defends this turn."); logAction("Enemy defends."); }
-    else if (choice === "Special" && enemyMana >= 20) {
-      let dmg = Math.floor(Math.random() * 15) + 25;
-      if (playerDefending) dmg = Math.floor(dmg / 2);
-      playerHealth -= dmg; enemyMana -= 20;
-      alert(`Enemy uses Special Attack! You take ${dmg} damage!`);
-      logAction(`Enemy Special → ${dmg} dmg, -20 MP.`);
-    } else if (choice === "Heal" && enemyMana >= 10) {
-      enemyHealth = Math.min(enemyHealth + 30, 100); enemyMana -= 10;
-      alert("Enemy heals for 30 HP!"); logAction("Enemy heals +30 HP, -10 MP.");
-    }
-
-    updateStats();
-    checkGameOver();
+    if(choice==="Attack"){let dmg=Math.floor(Math.random()*10)+10;if(playerDefending)dmg=Math.floor(dmg/2);playerHealth-=dmg;alert(`Enemy attacks you for ${dmg}!`);logAction(`Enemy attacks for ${dmg}.`);}
+    else if(choice==="Defend"){enemyDefending=true;alert("Enemy defends this turn.");logAction("Enemy defends.");}
+    else if(choice==="Special"&&enemyMana>=20){let dmg=Math.floor(Math.random()*15)+25;if(playerDefending)dmg=Math.floor(dmg/2);playerHealth-=dmg;enemyMana-=20;alert(`Enemy uses Special Attack! You take ${dmg} damage!`);logAction(`Enemy Special → ${dmg} dmg, -20 MP.`);}
+    else if(choice==="Heal"&&enemyMana>=10){enemyHealth=Math.min(enemyHealth+30,100);enemyMana-=10;alert("Enemy heals for 30 HP!");logAction("Enemy heals +30 HP, -10 MP.");}
+    updateStats(); checkGameOver();
   }
 
   function checkGameOver() {
-    if (playerHealth <= 0) {
-      alert("You Lose!"); logAction("Game Over → Player loses."); recapLog("Enemy");
-      scores.enemy++; updateScoreboard(); resetGame();
-    } else if (enemyHealth <= 0) {
-      alert("You Win!"); logAction("Game Over → Player wins."); recapLog("Player");
-      scores.player++; updateScoreboard(); resetGame();
-    }
+    if(playerHealth<=0){alert("You Lose!");logAction("Game Over → Player loses.");recapLog("Enemy");scores.enemy++;updateScoreboard();resetGame();}
+    else if(enemyHealth<=0){alert("You Win!");logAction("Game Over → Player wins.");recapLog("Player");scores.player++;updateScoreboard();resetGame();}
   }
 
 });
