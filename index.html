@@ -2,6 +2,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,18 +35,8 @@
     transition: background 0.2s;
   }
   button:disabled { background: #555; cursor: not-allowed; }
-  #walletInfo, #message {
-    margin: 12px 0;
-    text-align: center;
-    word-break: break-all;
-  }
-  #gameArea, #claimArea {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    margin-top: 20px;
-  }
+  #walletInfo, #message { margin: 12px 0; text-align: center; word-break: break-all; }
+  #gameArea, #claimArea { display: none; flex-direction: column; align-items: center; gap: 16px; margin-top: 20px; }
 </style>
 </head>
 <body>
@@ -53,13 +44,11 @@
 <div id="connect"></div>
 <div id="walletInfo">🔴 Wallet not connected</div>
 
-<!-- GAME AREA -->
 <div id="gameArea">
   <p>🔥 Game in progress... Fight bravely!</p>
   <button id="finishGame">Finish Game</button>
 </div>
 
-<!-- CLAIM AREA -->
 <div id="claimArea">
   <button id="claimBtn" disabled>Claim 50 RPG (DevNet)</button>
 </div>
@@ -67,96 +56,100 @@
 <div id="message"></div>
 
 <script type="module">
-const BACKEND_REWARD_URL = "https://ton-reward-server.vercel.app/api/reward-api";
-const REWARD_AMOUNT = 50;
+document.addEventListener("DOMContentLoaded", () => {
+  const BACKEND_REWARD_URL = "https://ton-reward-server.vercel.app/api/reward-api";
+  const REWARD_AMOUNT = 50;
 
-const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-  manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json",
-  uiOptions: { buttonRootId: "connect" }
-});
-tonConnectUI.render?.();
+  const walletInfo = document.getElementById("walletInfo");
+  const gameArea = document.getElementById("gameArea");
+  const claimArea = document.getElementById("claimArea");
+  const finishGameBtn = document.getElementById("finishGame");
+  const claimBtn = document.getElementById("claimBtn");
+  const message = document.getElementById("message");
 
-const walletInfo = document.getElementById("walletInfo");
-const gameArea = document.getElementById("gameArea");
-const claimArea = document.getElementById("claimArea");
-const finishGameBtn = document.getElementById("finishGame");
-const claimBtn = document.getElementById("claimBtn");
-const message = document.getElementById("message");
+  let gameFinished = false;
 
-let gameFinished = false;
+  // --- TON CONNECT UI ---
+  const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+    manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json",
+    uiOptions: { buttonRootId: "connect" }
+  });
 
-function getWalletAddress() {
-  try {
-    return tonConnectUI.account?.address ||
-           tonConnectUI.connector?.account?.address ||
-           tonConnectUI.connectedWallet?.account?.address || null;
-  } catch { return null; }
-}
+  tonConnectUI.render?.();
 
-function updateUI() {
-  const addr = getWalletAddress();
-  if (addr) {
-    walletInfo.innerHTML = `✅ Connected Wallet:<br>${addr}`;
-    gameArea.style.display = gameFinished ? "none" : "flex";
-    claimArea.style.display = gameFinished ? "flex" : "none";
-  } else {
-    walletInfo.innerHTML = "🔴 Wallet not connected";
-    gameArea.style.display = "none";
-    claimArea.style.display = "none";
+  function getWalletAddress() {
+    try {
+      return tonConnectUI.account?.address ||
+             tonConnectUI.connector?.account?.address ||
+             tonConnectUI.connectedWallet?.account?.address || null;
+    } catch { return null; }
   }
-  claimBtn.disabled = !addr || !gameFinished;
-}
 
-// Poll wallet connection every 700ms
-setInterval(updateUI, 700);
-
-tonConnectUI.onStatusChange(() => updateUI());
-
-finishGameBtn.addEventListener("click", () => {
-  gameFinished = true;
-  message.textContent = "🎯 Game completed! You can now claim your reward.";
-  updateUI();
-});
-
-claimBtn.addEventListener("click", async () => {
-  const address = getWalletAddress();
-  if (!address) { alert("Please connect your wallet first."); return; }
-
-  if (!confirm(`You will receive ${REWARD_AMOUNT} RPG tokens to ${address}. Proceed?`)) return;
-
-  claimBtn.disabled = true;
-  message.textContent = "⏳ Processing claim...";
-
-  try {
-    const res = await fetch(BACKEND_REWARD_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to: address, amount: REWARD_AMOUNT })
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      message.textContent = `Server error: ${res.status}`;
-      alert("Reward failed — check server logs.");
-      claimBtn.disabled = false;
-      return;
-    }
-
-    if (data.ok) {
-      message.textContent = `✅ Reward sent! Tx: ${data.tx}`;
-      alert(`Success! Transaction: ${data.tx}`);
+  function updateUI() {
+    const addr = getWalletAddress();
+    if (addr) {
+      walletInfo.innerHTML = `✅ Connected Wallet:<br>${addr}`;
+      gameArea.style.display = gameFinished ? "none" : "flex";
+      claimArea.style.display = gameFinished ? "flex" : "none";
     } else {
-      message.textContent = `❌ Server error: ${data.error || "unknown"}`;
-      alert(`Server error: ${data.error || "unknown"}`);
+      walletInfo.innerHTML = "🔴 Wallet not connected";
+      gameArea.style.display = "none";
+      claimArea.style.display = "none";
     }
-  } catch (err) {
-    console.error(err);
-    message.textContent = "⚠️ Network error while claiming reward.";
-    alert("Network error — check your connection.");
-  } finally {
-    claimBtn.disabled = false;
+    claimBtn.disabled = !addr || !gameFinished;
   }
+
+  setInterval(updateUI, 700); // keep UI in sync
+  tonConnectUI.onStatusChange(() => updateUI());
+
+  // --- FINISH GAME ---
+  finishGameBtn.addEventListener("click", () => {
+    gameFinished = true;
+    message.textContent = "🎯 Game completed! You can now claim your reward.";
+    updateUI();
+  });
+
+  // --- CLAIM REWARD ---
+  claimBtn.addEventListener("click", async () => {
+    const address = getWalletAddress();
+    if (!address) { alert("Please connect your wallet first."); return; }
+
+    if (!confirm(`You will receive ${REWARD_AMOUNT} RPG tokens to ${address}. Proceed?`)) return;
+
+    claimBtn.disabled = true;
+    message.textContent = "⏳ Processing claim...";
+
+    try {
+      const res = await fetch(BACKEND_REWARD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: address, amount: REWARD_AMOUNT })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        message.textContent = `Server error: ${res.status}`;
+        alert("Reward failed — check server logs.");
+        claimBtn.disabled = false;
+        return;
+      }
+
+      if (data.ok) {
+        message.textContent = `✅ Reward sent! Tx: ${data.tx}`;
+        alert(`Success! Transaction: ${data.tx}`);
+      } else {
+        message.textContent = `❌ Server error: ${data.error || "unknown"}`;
+        alert(`Server error: ${data.error || "unknown"}`);
+      }
+    } catch (err) {
+      console.error(err);
+      message.textContent = "⚠️ Network error while claiming reward.";
+      alert("Network error — check your connection.");
+    } finally {
+      claimBtn.disabled = false;
+    }
+  });
 });
 </script>
 </body>
