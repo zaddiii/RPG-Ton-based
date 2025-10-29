@@ -2,79 +2,72 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RPG TON Battle Arena</title>
+<title>RPG TON Battle Arena v2</title>
 <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 <style>
   body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    min-height: 100vh;
-    margin: 0;
-    padding: 36px;
-    background: #0d1117;
-    font-family: system-ui, sans-serif;
-    color: #fff;
+    background-color: burlywood;
+    font-family: "Times New Roman", serif;
+    color: black;
+    text-align: center;
+    transition: background-color 0.3s ease;
   }
-  h2 { margin-bottom: 16px; }
-  button {
-    padding: 10px 18px;
+  #gameArea button,
+  .startbutton {
     border: none;
-    border-radius: 8px;
+    border-radius: 15px;
+    padding: 8px 15px;
+    margin: 5px;
+    background-color: white;
+    color: black;
+    font-weight: bold;
     cursor: pointer;
-    font-size: 16px;
-    color: #fff;
-    background: #007bff;
-    transition: background 0.2s;
   }
-  button:disabled { background: #555; cursor: not-allowed; }
-  #walletInfo, #message { margin: 12px 0; text-align: center; word-break: break-all; }
-  #gameArea, #claimArea { display: none; flex-direction: column; align-items: center; gap: 16px; margin-top: 20px; }
+  #gameArea { margin-top: 20px; display: none; }
+  #connectRoot { margin: 20px 0; }
 </style>
 </head>
 <body>
-<h2>🎮 RPG TON Battle Arena</h2>
-<div id="connect"></div>
+<h1 class="heading1">🎮 RPG TON Battle Arena v2</h1>
+<div id="connectRoot"></div>
 <div id="walletInfo">🔴 Wallet not connected</div>
 
 <div id="gameArea">
-  <p>🔥 Game in progress... Fight bravely!</p>
-  <button id="finishGame">Finish Game</button>
+  <p>Player Health: <span id="playerHealth">100</span></p>
+  <p>Player Mana: <span id="playerMana">30</span></p>
+  <p>Enemy Health: <span id="enemyHealth">100</span></p>
+  <p>Enemy Mana: <span id="enemyMana">30</span></p>
+
+  <!-- Player buttons -->
+  <button onclick="playerAction('Attack')">Attack</button>
+  <button onclick="playerAction('Defend')">Defend</button>
+  <button onclick="playerAction('Special')">Special (-20 MP)</button>
+  <button onclick="playerAction('Heal')">Heal (+30 HP, -10 MP)</button>
+  <button onclick="resetGame(true)">Reset Game</button>
 </div>
 
-<div id="claimArea">
-  <button id="claimBtn" disabled>Claim 50 RPG (DevNet)</button>
-</div>
+<h2>Scoreboard</h2>
+<p>Player Wins: <span id="playerWins">0</span></p>
+<p>Enemy Wins: <span id="enemyWins">0</span></p>
 
-<div id="message"></div>
+<button class="startbutton" onclick="startGame()" style="display:none;">Start Game</button>
 
 <script type="module">
 document.addEventListener("DOMContentLoaded", () => {
-  const BACKEND_REWARD_URL = "https://ton-reward-server.vercel.app/api/reward-api";
-  const REWARD_AMOUNT = 50;
-
   const walletInfo = document.getElementById("walletInfo");
   const gameArea = document.getElementById("gameArea");
-  const claimArea = document.getElementById("claimArea");
-  const finishGameBtn = document.getElementById("finishGame");
-  const claimBtn = document.getElementById("claimBtn");
-  const message = document.getElementById("message");
+  const startButton = document.querySelector(".startbutton");
 
-  let gameFinished = false;
-
-  // --- TON CONNECT UI ---
+  // --- TON CONNECT ---
   const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
     manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json",
-    uiOptions: { buttonRootId: "connect" }
+    uiOptions: { buttonRootId: "connectRoot" }
   });
-
   tonConnectUI.render?.();
 
   function getWalletAddress() {
@@ -89,67 +82,145 @@ document.addEventListener("DOMContentLoaded", () => {
     const addr = getWalletAddress();
     if (addr) {
       walletInfo.innerHTML = `✅ Connected Wallet:<br>${addr}`;
-      gameArea.style.display = gameFinished ? "none" : "flex";
-      claimArea.style.display = gameFinished ? "flex" : "none";
+      startButton.style.display = "inline-block"; // show start button after connect
     } else {
       walletInfo.innerHTML = "🔴 Wallet not connected";
+      startButton.style.display = "none";
       gameArea.style.display = "none";
-      claimArea.style.display = "none";
     }
-    claimBtn.disabled = !addr || !gameFinished;
   }
 
-  setInterval(updateUI, 700); // keep UI in sync
-  tonConnectUI.onStatusChange(() => updateUI());
+  setInterval(updateUI, 700);
+  tonConnectUI.onStatusChange(updateUI);
 
-  // --- FINISH GAME ---
-  finishGameBtn.addEventListener("click", () => {
-    gameFinished = true;
-    message.textContent = "🎯 Game completed! You can now claim your reward.";
-    updateUI();
-  });
+  // --- GAME LOGIC ---
+  let playerHealth, enemyHealth, playerMana, enemyMana;
+  let scores = { player: 0, enemy: 0 };
+  let playerDefending = false;
+  let enemyDefending = false;
+  let manaRegenInterval;
+  let gameLog = [];
 
-  // --- CLAIM REWARD ---
-  claimBtn.addEventListener("click", async () => {
-    const address = getWalletAddress();
-    if (!address) { alert("Please connect your wallet first."); return; }
+  function startGame() {
+    resetGame(false);
+    gameArea.style.display = "block";
+    startButton.style.display = "none";
+    alert("Welcome to the Arena ⚔️!");
+    console.log("=== New Game Started ===");
+  }
 
-    if (!confirm(`You will receive ${REWARD_AMOUNT} RPG tokens to ${address}. Proceed?`)) return;
+  function resetGame(fullReset = false) {
+    playerHealth = 100; enemyHealth = 100; playerMana = 30; enemyMana = 30;
+    playerDefending = false; enemyDefending = false;
+    gameLog = [];
 
-    claimBtn.disabled = true;
-    message.textContent = "⏳ Processing claim...";
+    if (fullReset) { scores = { player: 0, enemy: 0 }; updateScoreboard(); }
 
-    try {
-      const res = await fetch(BACKEND_REWARD_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: address, amount: REWARD_AMOUNT })
-      });
+    updateStats();
+    console.log("Game reset: Player HP 100/MP 30 | Enemy HP 100/MP 30");
 
-      const data = await res.json().catch(() => ({}));
+    if (manaRegenInterval) clearInterval(manaRegenInterval);
+    manaRegenInterval = setInterval(() => {
+      if (playerMana < 30) playerMana++;
+      if (enemyMana < 30) enemyMana++;
+      updateStats();
+    }, 2000);
+  }
 
-      if (!res.ok) {
-        message.textContent = `Server error: ${res.status}`;
-        alert("Reward failed — check server logs.");
-        claimBtn.disabled = false;
-        return;
-      }
+  function updateStats() {
+    document.getElementById("playerHealth").innerText = playerHealth;
+    document.getElementById("enemyHealth").innerText = enemyHealth;
+    document.getElementById("playerMana").innerText = playerMana;
+    document.getElementById("enemyMana").innerText = enemyMana;
+  }
 
-      if (data.ok) {
-        message.textContent = `✅ Reward sent! Tx: ${data.tx}`;
-        alert(`Success! Transaction: ${data.tx}`);
-      } else {
-        message.textContent = `❌ Server error: ${data.error || "unknown"}`;
-        alert(`Server error: ${data.error || "unknown"}`);
-      }
-    } catch (err) {
-      console.error(err);
-      message.textContent = "⚠️ Network error while claiming reward.";
-      alert("Network error — check your connection.");
-    } finally {
-      claimBtn.disabled = false;
+  function updateScoreboard() {
+    document.getElementById("playerWins").innerText = scores.player;
+    document.getElementById("enemyWins").innerText = scores.enemy;
+  }
+
+  function logAction(text) { gameLog.push(text); console.log(text); }
+
+  function recapLog(winner) {
+    console.log("=== MATCH ENDED ===");
+    console.log("Winner: " + winner);
+    console.log("----- Full Recap -----");
+    gameLog.forEach((entry, i) => console.log((i+1) + ". " + entry));
+    console.log("======================");
+  }
+
+  function playerAction(action) {
+    playerDefending = false;
+    if (action === "Attack") {
+      let dmg = Math.floor(Math.random() * 10) + 10;
+      if (enemyDefending) dmg = Math.floor(dmg / 2);
+      enemyHealth -= dmg;
+      alert(`You attacked for ${dmg}!`);
+      logAction(`Player attacks for ${dmg}.`);
+    } else if (action === "Defend") {
+      playerDefending = true;
+      alert("You defend this turn.");
+      logAction("Player defends.");
+    } else if (action === "Special" && playerMana >= 20) {
+      let dmg = Math.floor(Math.random() * 15) + 25;
+      if (enemyDefending) dmg = Math.floor(dmg / 2);
+      enemyHealth -= dmg; playerMana -= 20;
+      alert(`You used a Special Attack! Enemy takes ${dmg} damage!`);
+      logAction(`Player uses Special → ${dmg} dmg, -20 MP.`);
+    } else if (action === "Heal" && playerMana >= 10) {
+      playerHealth = Math.min(playerHealth + 30, 100);
+      playerMana -= 10;
+      alert("You healed for 30 HP!");
+      logAction("Player heals +30 HP, -10 MP.");
+    } else {
+      alert("Not enough mana!");
+      logAction("Failed action: Not enough mana.");
     }
-  });
+    updateStats();
+    checkGameOver();
+    if (enemyHealth > 0) setTimeout(enemyTurn, 800);
+  }
+
+  function enemyTurn() {
+    enemyDefending = false;
+    let choice;
+    if (enemyHealth <= 50 && enemyMana >= 10) choice = Math.random() < 0.6 ? "Heal" : "Defend";
+    else if (enemyMana >= 20 && Math.random() < 0.5) choice = "Special";
+    else if (Math.random() < 0.2) choice = "Defend";
+    else choice = "Attack";
+
+    if (choice === "Attack") {
+      let dmg = Math.floor(Math.random() * 10) + 10;
+      if (playerDefending) dmg = Math.floor(dmg / 2);
+      playerHealth -= dmg;
+      alert(`Enemy attacks you for ${dmg}!`);
+      logAction(`Enemy attacks for ${dmg}.`);
+    } else if (choice === "Defend") { enemyDefending = true; alert("Enemy defends this turn."); logAction("Enemy defends."); }
+    else if (choice === "Special" && enemyMana >= 20) {
+      let dmg = Math.floor(Math.random() * 15) + 25;
+      if (playerDefending) dmg = Math.floor(dmg / 2);
+      playerHealth -= dmg; enemyMana -= 20;
+      alert(`Enemy uses Special Attack! You take ${dmg} damage!`);
+      logAction(`Enemy Special → ${dmg} dmg, -20 MP.`);
+    } else if (choice === "Heal" && enemyMana >= 10) {
+      enemyHealth = Math.min(enemyHealth + 30, 100); enemyMana -= 10;
+      alert("Enemy heals for 30 HP!"); logAction("Enemy heals +30 HP, -10 MP.");
+    }
+
+    updateStats();
+    checkGameOver();
+  }
+
+  function checkGameOver() {
+    if (playerHealth <= 0) {
+      alert("You Lose!"); logAction("Game Over → Player loses."); recapLog("Enemy");
+      scores.enemy++; updateScoreboard(); resetGame();
+    } else if (enemyHealth <= 0) {
+      alert("You Win!"); logAction("Game Over → Player wins."); recapLog("Player");
+      scores.player++; updateScoreboard(); resetGame();
+    }
+  }
+
 });
 </script>
 </body>
