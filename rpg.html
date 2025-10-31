@@ -238,8 +238,7 @@ function playerAction(act){
     playerMP-=SPECIAL_COST;
     const dmg=randInt(15,40);
     const actual=enemyDefending?Math.floor(dmg/2):dmg;
-    enemyHP=clamp(enemyHP-actual,0,
-[10/31, 23:56] joel_webdev: MAX_HP);
+    enemyHP=clamp(enemyHP-actual,0, MAX_HP);
     log(`Player uses Special → ${actual} dmg.`);
   } else if(act==='Heal'){
     if(playerMP<HEAL_COST){ log('Not enough mana.'); showToast('Not enough MP!'); return; }
