@@ -91,6 +91,35 @@
   </button>
 
 <script>
+
+const startBtn = document.getElementById('startBtn');
+const attackBtn = document.getElementById('attackBtn');
+const defendBtn = document.getElementById('defendBtn');
+const specialBtn = document.getElementById('specialBtn');
+const healBtn = document.getElementById('healBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+const battleLog = document.getElementById('battleLog');
+
+const playerHealthBar = document.getElementById('playerHealthBar');
+const playerManaBar = document.getElementById('playerManaBar');
+const playerHealthText = document.getElementById('playerHealthText');
+const playerManaText = document.getElementById('playerManaText');
+
+const enemyHealthBar = document.getElementById('enemyHealthBar');
+const enemyManaBar = document.getElementById('enemyManaBar');
+const enemyHealthText = document.getElementById('enemyHealthText');
+const enemyManaText = document.getElementById('enemyManaText');
+const enemyIntelligenceBar = document.getElementById('enemyIntelligenceBar');
+const enemyIntelligenceText = document.getElementById('enemyIntelligenceText');
+
+const toast = document.getElementById('toast');
+
+const playerWins = document.getElementById('playerWins');
+const enemyWins = document.getElementById('enemyWins');
+const score = document.getElementById('score');
+const aiIQ = document.getElementById('aiIQ');
+
 const BACKEND_URL="https://ton-reward-server-rfbv.vercel.app/api/reward";
 
 const MAX_HP=200, MAX_MP=50, SPECIAL_COST=40, HEAL_COST=30, HEAL_HP=20;
