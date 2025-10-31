@@ -11,8 +11,6 @@
 
   <!-- TON Connect UI -->
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-
-  <!-- TON SDKs -->
   <script src="https://unpkg.com/@tonconnect/sdk@2.1.1/dist/tonconnect-sdk.min.js"></script>
   <script src="https://unpkg.com/tonweb@0.0.67/dist/tonweb.min.js"></script>
 
@@ -22,10 +20,12 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
       font-family: sans-serif;
       background: #0d1117;
       color: #fff;
+      padding: 20px;
+      position: relative;
     }
     #connect {
       margin-bottom: 20px;
@@ -38,11 +38,38 @@
       color: #fff;
       cursor: pointer;
       font-size: 16px;
+      margin: 10px;
+      transition: 0.2s;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
     }
     #walletInfo {
       margin-top: 20px;
       text-align: center;
       word-break: break-all;
+    }
+
+    /* Toast notification style */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #1a1c28;
+      color: #fff;
+      padding: 15px 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      z-index: 9999;
+      font-weight: 500;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
     }
   </style>
 </head>
@@ -50,73 +77,100 @@
 <body>
   <h2>🎮 RPG TON Battle Arena</h2>
   <div id="connect"></div>
-  <div id="walletInfo"></div>
+  <div id="walletInfo">🔴 Wallet not connected</div>
 
-  <button id="checkNFTs" style="display:none;">Scan for NFTs</button>
-  <button id="claimReward" style="display:none;">Claim</button>
+  <!-- Game play button -->
+  <div id="gameControls" style="display:none; flex-direction: column; align-items: center;">
+    <button id="playRPG3">🎮 Play RPG</button>
+  </div>
 
   <script type="module">
-    // ✅ Correct backend URL (your live Vercel deployment)
     const BACKEND_URL = "https://ton-reward-server-rfbv.vercel.app/api/reward";
 
     // Initialize TON Connect UI
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
     });
+    tonConnectUI.uiOptions = { language: "en", buttonRootId: "connect" };
 
-    tonConnectUI.uiOptions = {
-      language: "en",
-      buttonRootId: "connect"
-    };
+    const walletInfoDiv = document.getElementById("walletInfo");
+    const gameControlsDiv = document.getElementById("gameControls");
+    const playBtn = document.getElementById("playRPG");
+
+    let connectedAddress = null;
+    let gameWindow = null;
+
+    // Toast function
+    function showToast(message) {
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.classList.add("show"), 100);
+      setTimeout(() => {
+        toast.classList.remove("show");
+        setTimeout(() => document.body.removeChild(toast), 400);
+      }, 3000);
+    }
 
     // Handle wallet connection
     tonConnectUI.onStatusChange(async (walletInfo) => {
-      const infoDiv = document.getElementById("walletInfo");
-      const nftBtn = document.getElementById("checkNFTs");
-      const rewardBtn = document.getElementById("claimReward");
-
       if (walletInfo && walletInfo.account) {
-        const address = walletInfo.account.address;
-        infoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${address}</p>`;
-        nftBtn.style.display = "inline-block";
-        rewardBtn.style.display = "inline-block";
+        connectedAddress = walletInfo.account.address;
+        walletInfoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${connectedAddress}</p>`;
+        gameControlsDiv.style.display = "flex";
       } else {
-        infoDiv.innerHTML = `<p>🔴 Wallet not connected</p>`;
-        nftBtn.style.display = "none";
-        rewardBtn.style.display = "none";
+        connectedAddress = null;
+        walletInfoDiv.innerHTML = "🔴 Wallet not connected";
+        gameControlsDiv.style.display = "none";
       }
     });
 
-    // Mock NFT scanner
-    document.getElementById("checkNFTs").addEventListener("click", async () => {
-      alert("🔍 Scanning for NFTs... (simulation)");
-    });
+    // Play RPG v3
+    playBtn.addEventListener("click", () => {
+      if (!connectedAddress) return showToast("⚠️ Connect your wallet first!");
+      if (gameWindow && !gameWindow.closed) return showToast("⚠️ Game already open!");
 
-    // Claim reward function — connects to backend
-    document.getElementById("claimReward").addEventListener("click", async () => {
-      const wallet = await tonConnectUI.getWallet();
-      if (!wallet) return alert("Please connect your wallet first!");
+      playBtn.disabled = true;
 
-      const address = wallet.account.address;
-      alert("🏆 Claiming reward for " + address);
+      gameWindow = window.open("rpg.html", "_blank", "noopener,noreferrer");
 
-      try {
-        const res = await fetch(BACKEND_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: address })
-        });
+      // Listen for automatic win
+      const onMessage = async (event) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data === "WIN") {
+          showToast("🎉 Victory detected! Claiming reward...");
 
-        const data = await res.json();
-        if (data.ok) {
-          alert(`✅ Reward sent! Tx: ${data.tx || "simulated"}`);
-        } else {
-          alert(`❌ Server error: ${data.error || "Unknown issue"}`);
+          try {
+            const res = await fetch(BACKEND_URL, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ to: connectedAddress })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              showToast(`✅ Reward sent! Tx: ${data.tx || "simulated"}`);
+            } else {
+              showToast(`❌ Server error: ${data.error || "Unknown issue"}`);
+            }
+          } catch (e) {
+            showToast("⚠️ Network or CORS issue — check backend logs.");
+            console.error(e);
+          }
+
+          playBtn.disabled = false;
+          window.removeEventListener("message", onMessage);
         }
-      } catch (e) {
-        alert("⚠️ Network or CORS issue — check backend setup or logs.");
-        console.error(e);
-      }
+      };
+      window.addEventListener("message", onMessage);
+
+      // Re-enable button if game closes without win
+      const checkGameClosed = setInterval(() => {
+        if (gameWindow.closed) {
+          playBtn.disabled = false;
+          clearInterval(checkGameClosed);
+        }
+      }, 500);
     });
   </script>
 </body>

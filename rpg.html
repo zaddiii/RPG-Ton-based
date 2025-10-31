@@ -1,0 +1,178 @@
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RPG Battle Arena v4</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: "Times New Roman", serif; background-color: #001f3f; color: #fff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; overflow-x: hidden; }
+  .bar { transition: width 0.25s ease; }
+  .bar-text { position: absolute; top: 50%; transform: translateY(-50%); right: 6px; }
+  .toast { position: fixed; top: 20px; right: 20px; background: #1a1c28; color: #fff; padding: 15px 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); opacity: 0; transform: translateY(-20px); transition: opacity 0.4s ease, transform 0.4s ease; z-index: 9999; font-weight: 500; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<h2>🎮 RPG Battle Arena v4</h2>
+
+<div id="gameArea" class="flex flex-col items-center w-full max-w-3xl mt-4">
+  <h1 class="text-xl sm:text-2xl font-bold text-center mb-2">RPG Battle Arena</h1>
+
+  <div id="scoreboard" class="bg-blue-950/80 p-3 rounded-xl shadow-lg text-xs w-full mb-4">
+    <p><strong>Player Wins:</strong> <span id="playerWins">0</span></p>
+    <p><strong>Enemy Wins:</strong> <span id="enemyWins">0</span></p>
+    <p><strong>Score:</strong> <span id="score">0</span></p>
+    <p><strong>AI IQ:</strong> <span id="aiIQ">0</span></p>
+  </div>
+
+  <div class="bg-blue-950/30 rounded-2xl shadow-xl p-4 w-full flex flex-col gap-4">
+    <!-- Player Section -->
+    <div>
+      <p class="text-lg font-semibold text-center">🧑‍🎮 Player</p>
+      <div class="relative bg-gray-800 rounded-lg h-4 w-full overflow-hidden my-2">
+        <div id="playerHealthBar" class="bar bg-red-600 h-full w-full"></div>
+        <span id="playerHealthText" class="bar-text text-[11px]">200 / 200</span>
+      </div>
+      <div class="relative bg-gray-800 rounded-lg h-4 w-full overflow-hidden">
+        <div id="playerManaBar" class="bar bg-blue-500 h-full w-full"></div>
+        <span id="playerManaText" class="bar-text text-[11px]">50 / 50</span>
+      </div>
+    </div>
+
+    <!-- Enemy Section -->
+    <div>
+      <p class="text-lg font-semibold text-center">👾 Enemy</p>
+      <div class="relative bg-gray-800 rounded-lg h-4 w-full overflow-hidden my-2">
+        <div id="enemyHealthBar" class="bar bg-red-600 h-full w-full"></div>
+        <span id="enemyHealthText" class="bar-text text-[11px]">200 / 200</span>
+      </div>
+      <div class="relative bg-gray-800 rounded-lg h-4 w-full overflow-hidden">
+        <div id="enemyManaBar" class="bar bg-blue-500 h-full w-full"></div>
+        <span id="enemyManaText" class="bar-text text-[11px]">50 / 50</span>
+      </div>
+      <div class="relative bg-gray-800 rounded-lg h-4 w-full overflow-hidden mt-2">
+        <div id="enemyIntelligenceBar" class="bar bg-green-400 h-full w-0"></div>
+        <span id="enemyIntelligenceText" class="bar-text text-[11px]">IQ 0</span>
+      </div>
+    </div>
+
+    <!-- Battle Log -->
+    <div id="battleLog" class="bg-gray-900/70 text-gray-100 p-3 rounded-lg overflow-y-auto text-xs sm:text-sm shadow-inner" style="max-height:25vh;"></div>
+  </div>
+</div>
+
+<script>
+const BACKEND_URL="https://ton-reward-server-rfbv.vercel.app/api/reward";
+
+const MAX_HP=200, MAX_MP=50, SPECIAL_COST=40, HEAL_COST=30, HEAL_HP=20;
+let playerHP=MAX_HP, playerMP=MAX_MP, enemyHP=MAX_HP, enemyMP=MAX_MP;
+let enemyIQ=0, enemyDefending=false, playerDefending=false;
+let scores={player:0,enemy:0,score:0};
+let aiInterval=null, aiActive=false;
+
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const log=t=>{const p=document.createElement('p'); p.innerText=t; battleLog.appendChild(p); battleLog.scrollTop=battleLog.scrollHeight;};
+
+function updateBars(){
+  playerHealthBar.style.width=(playerHP/MAX_HP*100)+'%';
+  playerManaBar.style.width=(playerMP/MAX_MP*100)+'%';
+  enemyHealthBar.style.width=(enemyHP/MAX_HP*100)+'%';
+  enemyManaBar.style.width=(enemyMP/MAX_MP*100)+'%';
+  playerHealthText.innerText=`${playerHP}/${MAX_HP}`;
+  playerManaText.innerText=`${playerMP}/${MAX_MP}`;
+  enemyHealthText.innerText=`${enemyHP}/${MAX_HP}`;
+  enemyManaText.innerText=`${enemyMP}/${MAX_MP}`;
+  enemyIntelligenceBar.style.width=enemyIQ+'%';
+  enemyIntelligenceText.innerText=`IQ ${enemyIQ.toFixed(1)}`;
+}
+
+function updateScoreboard(){
+  playerWins.innerText=scores.player;
+  enemyWins.innerText=scores.enemy;
+  score.innerText=scores.score;
+  aiIQ.innerText=enemyIQ.toFixed(1);
+}
+
+function decideAction(){
+  let actions=['Attack','Defend','Heal','Special'];
+  if(enemyMP<HEAL_COST) actions=actions.filter(a=>a!=='Heal');
+  if(enemyMP<SPECIAL_COST) actions=actions.filter(a=>a!=='Special');
+  if(enemyIQ<20) return actions[randInt(0,actions.length-1)];
+  if(enemyHP<MAX_HP*0.6 && enemyMP>=HEAL_COST) return 'Heal';
+  if(playerHP>MAX_HP*0.3 && enemyMP>=SPECIAL_COST) return 'Special';
+  if(Math.random()<0.3) return 'Defend';
+  return 'Attack';
+}
+
+function enemyAction(){
+  if(playerHP<=0 || enemyHP<=0) return;
+  const action=decideAction();
+  if(action==='Attack'){
+    const dmg=randInt(18,35);
+    const actual=playerDefending?Math.floor(dmg/2):dmg;
+    playerHP=clamp(playerHP-actual,0,MAX_HP);
+    log(`Enemy attacks → ${actual} dmg.`);
+  } else if(action==='Defend'){
+    enemyDefending=true; log('Enemy defends.');
+  } else if(action==='Special' && enemyMP>=SPECIAL_COST){
+    enemyMP-=SPECIAL_COST;
+    const dmg=randInt(15,40);
+    const actual=playerDefending?Math.floor(dmg/2):dmg;
+    playerHP=clamp(playerHP-actual,0,MAX_HP);
+    log(`Enemy uses Special → ${actual} dmg.`);
+  } else if(action==='Heal' && enemyMP>=HEAL_COST){
+    enemyMP-=HEAL_COST;
+    enemyHP=clamp(enemyHP+HEAL_HP,0,MAX_HP);
+    log(`Enemy heals +${HEAL_HP} HP.`);
+  }
+  updateBars();
+  checkGameEnd();
+}
+
+function checkGameEnd(){
+  if(playerHP<=0){
+    log('Enemy wins!');
+    scores.enemy++;
+    resetRound();
+  } else if(enemyHP<=0){
+    log('Player wins!');
+    scores.player++;
+    sendReward();
+    resetRound();
+  }
+  updateScoreboard();
+}
+
+function sendReward(){
+  fetch(BACKEND_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({winner:'player', score:scores.score})})
+  .then(r=>r.json())
+  .then(d=>log(`Reward sent: ${JSON.stringify(d)}`))
+  .catch(e=>log(`Reward error: ${e}`));
+}
+
+function resetRound(){
+  playerHP=MAX_HP; playerMP=MAX_MP;
+  enemyHP=MAX_HP; enemyMP=MAX_MP;
+  enemyIQ=randInt(0,100);
+  updateBars();
+}
+
+function startGame(){
+  if(aiInterval) clearInterval(aiInterval);
+  aiActive=true;
+  aiInterval=setInterval(enemyAction, 1000);
+}
+
+startGame();
+</script>
+
+</body>
+</html>
