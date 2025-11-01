@@ -137,9 +137,11 @@
 
       // Listen for automatic win
       const onMessage = async (event) => {
-        if (event.origin !== window.location.origin) return;
-        if (event.data === "WIN") {
-          showToast("🎉 Victory detected! Claiming reward...");
+  if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
+  if (event.data === "WIN") {
+    // reward logic...
+  }
+}; {showToast("🎉 Victory detected! Claiming reward...");
 
           try {
             const res = await fetch(BACKEND_URL, {
