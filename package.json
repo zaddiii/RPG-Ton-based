@@ -1,0 +1,27 @@
+{
+  "name": "ton-game-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "mint_jetton.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zaddiii/RPG-Ton-based.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/zaddiii/RPG-Ton-based/issues"
+  },
+  "homepage": "https://github.com/zaddiii/RPG-Ton-based#readme",
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "ton": "^13.9.0",
+    "ton-core": "^0.53.0",
+    "ton-crypto": "^3.2.0"
+  }
+}
