@@ -2,6 +2,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,8 +51,6 @@
       text-align: center;
       word-break: break-all;
     }
-
-    /* Toast notification style */
     .toast {
       position: fixed;
       top: 20px;
@@ -79,7 +78,6 @@
   <div id="connect"></div>
   <div id="walletInfo">🔴 Wallet not connected</div>
 
-  <!-- Game play button -->
   <div id="gameControls" style="display:none; flex-direction: column; align-items: center;">
     <button id="playRPG">🎮 Play RPG</button>
   </div>
@@ -87,7 +85,6 @@
   <script type="module">
     const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/api/reward";
 
-    // Initialize TON Connect UI
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
     });
@@ -100,7 +97,6 @@
     let connectedAddress = null;
     let gameWindow = null;
 
-    // Toast function
     function showToast(message) {
       const toast = document.createElement("div");
       toast.className = "toast";
@@ -113,7 +109,6 @@
       }, 3000);
     }
 
-    // Handle wallet connection
     tonConnectUI.onStatusChange(async (walletInfo) => {
       if (walletInfo && walletInfo.account) {
         connectedAddress = walletInfo.account.address;
@@ -126,23 +121,19 @@
       }
     });
 
-    // Play RPG v3
     playBtn.addEventListener("click", () => {
       if (!connectedAddress) return showToast("⚠️ Connect your wallet first!");
       if (gameWindow && !gameWindow.closed) return showToast("⚠️ Game already open!");
 
       playBtn.disabled = true;
-
       gameWindow = window.open("rpg.html", "_blank", "noopener,noreferrer");
 
-      // Listen for automatic win
       const onMessage = async (event) => {
-  if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
-  if (event.data === "WIN") {
-    // reward logic...
-  }
-}; {showToast("🎉 Victory detected! Claiming reward...");
+        // Only allow messages from github.io or localhost
+        if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
 
+        if (event.data === "WIN") {
+          showToast("🎉 Victory detected! Claiming reward...");
           try {
             const res = await fetch(BACKEND_URL, {
               method: "POST",
@@ -164,9 +155,9 @@
           window.removeEventListener("message", onMessage);
         }
       };
+
       window.addEventListener("message", onMessage);
 
-      // Re-enable button if game closes without win
       const checkGameClosed = setInterval(() => {
         if (gameWindow.closed) {
           playBtn.disabled = false;
