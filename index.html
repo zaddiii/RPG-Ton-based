@@ -163,6 +163,15 @@
         }
       }, 500);
     });
+
+fetch("https://rpg-backend-gocj.onrender.com/api/reward", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ to: "test_user", score: 100 }),
+})
+  .then(res => res.json())
+  .then(data => console.log("Response from backend:", data))
+  .catch(err => console.error("Failed to fetch:", err));
   </script>
 </body>
 </html>
