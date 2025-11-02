@@ -81,7 +81,8 @@
   </div>
 
   <script type="module">
-    const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/reward";
+    const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/api/reward";
+body: JSON.stringify({ to: connectedAddress, score: 50 })
 
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
