@@ -111,6 +111,7 @@
     tonConnectUI.onStatusChange(async (walletInfo) => {
       if (walletInfo && walletInfo.account) {
         connectedAddress = walletInfo.account.address;
+        console.log("✅ Connected wallet address:", connectedAddress);
         walletInfoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${connectedAddress}</p>`;
         gameControlsDiv.style.display = "flex";
       } else {
@@ -128,16 +129,23 @@
       gameWindow = window.open("rpg.html", "_blank", "noopener,noreferrer");
 
       const onMessage = async (event) => {
-        // Only allow messages from github.io or localhost
         if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
 
         if (event.data === "WIN") {
           showToast("🎉 Victory detected! Claiming reward...");
+          console.log("🎯 Sending reward to:", connectedAddress);
+
+          if (!connectedAddress || connectedAddress === "undefined") {
+            showToast("⚠️ Wallet address missing — please reconnect wallet.");
+            console.error("❌ No connectedAddress found before sending reward!");
+            return;
+          }
+
           try {
             const res = await fetch(BACKEND_URL, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ to: connectedAddress, amount: 50 })  // ✅ fixed key
+              body: JSON.stringify({ to: connectedAddress, amount: 50 })
             });
             const data = await res.json();
             if (data.ok) {
@@ -165,14 +173,15 @@
       }, 500);
     });
 
-fetch("https://rpg-backend-gocj.onrender.com/api/reward", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ to: "test_user", score: 100 }),
-})
-  .then(res => res.json())
-  .then(data => console.log("Response from backend:", data))
-  .catch(err => console.error("Failed to fetch:", err));
+    // ✅ Simple live test for backend connection
+    fetch("https://rpg-backend-gocj.onrender.com/api/reward", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: "test_user", score: 100 }),
+    })
+    .then(res => res.json())
+    .then(data => console.log("Response from backend:", data))
+    .catch(err => console.error("Failed to fetch:", err));
   </script>
 </body>
 </html>
