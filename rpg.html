@@ -84,6 +84,25 @@
   </button>
 
 <script>
+import { TonConnect } from "@tonconnect/sdk";
+
+const tonConnect = new TonConnect({
+  manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
+});
+
+async function getWalletAddress() {
+  const wallet = tonConnect.wallet;
+  if (wallet && wallet.account) {
+    connectedAddress = wallet.account.address;
+    console.log("✅ Connected wallet (direct):", connectedAddress);
+    document.getElementById("connectedAddr").textContent = connectedAddress;
+  } else {
+    console.log("⚠️ No wallet connected in TonConnect session.");
+  }
+}
+
+getWalletAddress();
+
 /* ======== Wallet & Parent Messaging ======== */
 const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/api/reward";
 let connectedAddress = null;
