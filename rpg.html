@@ -288,6 +288,9 @@ async function sendReward(){
     }
   }catch(e){ log("⚠️ Network error: "+e.message); }
 }
+
+// ✅ Let parent know this page is ready to receive wallet
+window.opener?.postMessage?.({ type: "READY_FOR_WALLET" }, "*");
 </script>
 </body>
 </html>
