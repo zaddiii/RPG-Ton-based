@@ -73,7 +73,7 @@
   </div>
 
   <script type="module">
-    const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/api/reward";
+    // 🔹 Initialize TON Connect UI
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
     });
@@ -112,7 +112,7 @@
       }
     });
 
-    // 🎮 Open RPG game and send wallet address only
+    // 🎮 Open RPG and send wallet address ONLY
     playBtn.addEventListener("click", () => {
       if (!connectedAddress) return showToast("⚠️ Connect your wallet first!");
       if (gameWindow && !gameWindow.closed) return showToast("⚠️ Game already open!");
@@ -120,7 +120,6 @@
       playBtn.disabled = true;
       gameWindow = window.open("rpg.html", "_blank", "noopener,noreferrer");
 
-      // 🔁 Retry sending wallet to RPG until confirmed
       let retries = 0;
       const sendWalletToGame = setInterval(() => {
         if (!gameWindow || gameWindow.closed || retries >= 10) {
@@ -128,46 +127,25 @@
           return;
         }
         console.log(`📨 Sending wallet to RPG attempt #${retries + 1}:`, connectedAddress);
-        // ✅ Only sending wallet address — NOT backend URL
+        // ✅ Only send wallet address — no backend URL
         gameWindow.postMessage({ type: "CONNECT_WALLET", address: connectedAddress }, "*");
         retries++;
       }, 1000);
 
-      const onMessage = async (event) => {
+      const onMessage = (event) => {
+        // Allow messages only from same GitHub Pages domain or local dev
         if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
 
-        if (event.data === "WALLET_RECEIVED") {
+        const data = event.data || {};
+        if (data.type === "WALLET_RECEIVED") {
           console.log("✅ RPG confirmed wallet address received");
+          showToast("🎮 Wallet connected in game!");
           clearInterval(sendWalletToGame);
         }
 
-        if (event.data === "WIN") {
-          showToast("🎉 Victory detected! Claiming reward...");
-          console.log("🎯 Sending reward to:", connectedAddress);
-
-          if (!connectedAddress || connectedAddress === "undefined") {
-            showToast("⚠️ Wallet address missing — please reconnect wallet.");
-            console.error("❌ No connectedAddress found before sending reward!");
-            return;
-          }
-
-          try {
-            const res = await fetch(BACKEND_URL, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ to: connectedAddress, amount: 50 })
-            });
-            const data = await res.json();
-            if (data.ok) {
-              showToast(`✅ Reward sent! Tx: ${data.tx || "simulated"}`);
-            } else {
-              showToast(`❌ Server error: ${data.error || "Unknown issue"}`);
-            }
-          } catch (e) {
-            showToast("⚠️ Network or CORS issue — check backend logs.");
-            console.error(e);
-          }
-
+        if (data.type === "WIN") {
+          showToast("🎉 Victory detected! Reward will be handled by RPG backend.");
+          console.log("🏆 WIN signal received from RPG (reward handled inside RPG)");
           playBtn.disabled = false;
           window.removeEventListener("message", onMessage);
         }
@@ -182,16 +160,6 @@
         }
       }, 500);
     });
-
-    // ✅ Quick backend test on load
-    fetch(BACKEND_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to: "test_user", score: 100 }),
-    })
-      .then(res => res.json())
-      .then(data => console.log("Response from backend:", data))
-      .catch(err => console.error("Failed to fetch:", err));
   </script>
 </body>
 </html>
