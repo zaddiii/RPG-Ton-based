@@ -1,6 +1,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -109,6 +110,15 @@ async function initTonConnect() {
 }
 initTonConnect();
 
+/* ✅ BONUS LOCALSTORAGE TRICK — load wallet saved by frontend */
+const savedWallet = localStorage.getItem("rpg_wallet");
+if (savedWallet && !connectedAddress) {
+  connectedAddress = savedWallet;
+  connectedAddrEl.textContent = connectedAddress;
+  connectedAddrEl.style.display = "inline";
+  console.log("💾 Wallet loaded from localStorage:", connectedAddress);
+}
+
 /* ======== Parent Messaging ======== */
 let parentWindowRef = null;
 let parentOrigin = null;
@@ -139,7 +149,7 @@ window.addEventListener("message", (ev) => {
 
 window.opener?.postMessage?.({ type: "READY_FOR_WALLET" }, "*");
 
-/* ======== Core Game System (Unchanged) ======== */
+/* ======== Core Game System (UNCHANGED) ======== */
 const MAX_HP=200, MAX_MP=50, SPECIAL_COST=40, HEAL_COST=30, HEAL_HP=20;
 let playerHP=MAX_HP, playerMP=MAX_MP, enemyHP=MAX_HP, enemyMP=MAX_MP;
 let enemyIQ=0, enemyDefending=false, playerDefending=false;
