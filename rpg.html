@@ -2,7 +2,6 @@
 
 
 
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -98,12 +97,7 @@
   </button>
 
 <script>
-/* =========   Minimal additions to accept parent address & backend   =========
-   - listens for postMessage { type: "PARENT_ADDRESS", address, backend }
-   - fallback: request address from opener
-   - sendReward() uses connectedAddress and backendUrl
-   - posts result back to opener: { type: "CLAIM_RESULT", ok, tx?, error? }
-   ========================================================================== */
+/* ========= Receive parent wallet & backend, ack, auto-claim on win ========= */
 
 const gameArea = document.getElementById('gameArea');
 const startBtn = document.getElementById('startBtn');
@@ -137,11 +131,13 @@ const aiIQ = document.getElementById('aiIQ');
 const connectedAddrEl = document.getElementById('connectedAddr');
 const backendEl = document.getElementById('backendUrl');
 
-// default backend (you can override from parent message)
-let backendUrl = "https://rpg-backend-gocj.onrender.com/api/reward";
+let backendUrl = "https://rpg-backend-gocj.onrender.com/api/reward"; // default, can be overridden
 let connectedAddress = null;
 
-// game constants (unchanged)
+// store reference to parent window + origin so we can post results back
+let parentWindowRef = null;
+let parentOrigin = null;
+
 const MAX_HP=200, MAX_MP=50, SPECIAL_COST=40, HEAL_COST=30, HEAL_HP=20;
 let playerHP=MAX_HP, playerMP=MAX_MP, enemyHP=MAX_HP, enemyMP=MAX_MP;
 let enemyIQ=0, enemyDefending=false, playerDefending=false;
@@ -158,19 +154,29 @@ function showToast(msg){
   setTimeout(()=>toast.classList.remove('show'), 2500);
 }
 
-/* ---------- message handling ---------- */
-
-// Accept address + backend from parent window
+/* ---------- message handling ----------
+   Accepts:
+    - { type: "CONNECT_WALLET", address, backend? } (from parent)
+    - { type: "PARENT_ADDRESS", address, backend? } (backwards compat)
+    - { type: "REQUEST_STATUS" } (parent asking for status)
+   Replies:
+    - posts { type: "WALLET_RECEIVED" } to parent once accepted
+    - posts { type: "CLAIM_RESULT", ok, tx?, error? } after sendReward()
+-------------------------------------------------------------- */
 window.addEventListener('message', (ev) => {
-  // IMPORTANT: if you want stricter security, replace this allowed check with exact origin compare
+  // Accept messages from same origin OR from known allowed origins (customize if needed)
   const allowed = ["https://zaddiii.github.io", "http://localhost:5500", "http://localhost:3000"];
-  if (!(ev.origin === window.origin || allowed.some(a => ev.origin.startsWith(a)))) {
-    // ignore messages from unknown origins
-    return;
-  }
+  const okOrigin = (ev.origin === window.origin) || allowed.some(a => ev.origin.startsWith(a));
+  if (!okOrigin) return; // ignore unknown origins
 
   const data = ev.data || {};
-  if (data.type === "PARENT_ADDRESS") {
+  // store parent window reference when present so we can reply later
+  if (ev.source) {
+    parentWindowRef = ev.source;
+    parentOrigin = ev.origin || "*";
+  }
+
+  if (data.type === "CONNECT_WALLET" || data.type === "PARENT_ADDRESS") {
     if (data.address) {
       connectedAddress = data.address;
       connectedAddrEl.innerText = connectedAddress;
@@ -181,18 +187,28 @@ window.addEventListener('message', (ev) => {
     } else {
       backendEl.innerText = backendUrl;
     }
-    log("Received address from parent: " + (connectedAddress || "none"));
+
+    // ack back that we received the wallet
+    try {
+      parentWindowRef?.postMessage?.({ type: "WALLET_RECEIVED", address: connectedAddress }, parentOrigin || "*");
+    } catch(e){ /* ignore */ }
+
+    log("Received parent message. addr=" + (connectedAddress || "none") + " backend=" + backendUrl);
   }
 
-  // parent may request current status
   if (data.type === "REQUEST_STATUS") {
     try {
-      ev.source.postMessage({ type: "STATUS", address: connectedAddress, backend: backendUrl }, ev.origin);
+      parentWindowRef?.postMessage?.({ type: "STATUS", address: connectedAddress, backend: backendUrl }, parentOrigin || "*");
     } catch(e){}
+  }
+
+  // allow parent to force a manual claim
+  if (data.type === "FORCE_CLAIM") {
+    sendReward();
   }
 });
 
-// fallback: ask opener for address if page opened by parent but no message arrived yet
+// fallback: ask opener (if opened by parent) to send address if nothing came yet
 function requestAddressFromOpener() {
   try {
     if (window.opener && !window.opener.closed) {
@@ -200,24 +216,19 @@ function requestAddressFromOpener() {
     }
   } catch(e){}
 }
-setTimeout(requestAddressFromOpener, 300);
+setTimeout(requestAddressFromOpener, 200);
 
-/* ---------- reward send function now uses connectedAddress ---------- */
-
+/* ---------- sendReward uses connectedAddress & backendUrl and posts result back ---------- */
 async function sendReward(){
-  // require connected address supplied by parent
-  if(!connectedAddress){
-    log("Reward aborted: no connected address provided by parent.");
+  if (!connectedAddress) {
+    log("Reward aborted: no connected address provided.");
     showToast("No connected address — cannot claim reward.");
-    // notify parent if possible
-    try { window.opener?.postMessage({ type:"CLAIM_RESULT", ok:false, error:"no_address" }, "*"); } catch(e){}
+    try { parentWindowRef?.postMessage?.({ type: "CLAIM_RESULT", ok:false, error:"no_address" }, parentOrigin || "*"); } catch(e){}
     return;
   }
 
-  // payload — your backend expects { to, amount } per our agreement
   const payload = { to: connectedAddress, amount: 50 };
-
-  log("Sending reward request to backend: " + backendUrl + "  payload: " + JSON.stringify(payload));
+  log("Sending reward request to backend: " + backendUrl + " payload: " + JSON.stringify(payload));
   showToast("Claiming reward...");
 
   try {
@@ -233,22 +244,21 @@ async function sendReward(){
     if (res.ok && json && json.ok) {
       log("Reward backend OK: " + JSON.stringify(json));
       showToast("Reward requested ✓");
-      // notify parent
-      try { window.opener?.postMessage({ type:"CLAIM_RESULT", ok:true, tx: json.tx || null }, "*"); } catch(e){}
+      try { parentWindowRef?.postMessage?.({ type:"CLAIM_RESULT", ok:true, tx: json.tx || null }, parentOrigin || "*"); } catch(e){}
     } else {
       const errMsg = (json && json.error) ? json.error : `HTTP ${res.status}`;
       log("Reward backend error: " + errMsg);
       showToast("Reward failed");
-      try { window.opener?.postMessage({ type:"CLAIM_RESULT", ok:false, error:errMsg }, "*"); } catch(e){}
+      try { parentWindowRef?.postMessage?.({ type:"CLAIM_RESULT", ok:false, error:errMsg }, parentOrigin || "*"); } catch(e){}
     }
   } catch (err) {
     log("Network error sending reward: " + String(err));
     showToast("Network error when claiming");
-    try { window.opener?.postMessage({ type:"CLAIM_RESULT", ok:false, error: String(err) }, "*"); } catch(e){}
+    try { parentWindowRef?.postMessage?.({ type:"CLAIM_RESULT", ok:false, error: String(err) }, parentOrigin || "*"); } catch(e){}
   }
 }
 
-/* ============ rest of your original game logic (unchanged) ============ */
+/* ============ game logic (kept from your version) ============ */
 
 function updateBars(){
   playerHealthBar.style.width=(playerHP/MAX_HP*100)+'%';
@@ -362,7 +372,7 @@ function checkEnd(){
       scores.player++;
       scores.score++;
       showToast("Player wins!");
-      // when player wins, trigger reward flow
+      // auto-trigger reward flow (uses parent-supplied address)
       sendReward();
     }
     updateScoreboard();
