@@ -109,6 +109,9 @@ window.addEventListener("message", (ev) => {
   }
 });
 
+/* === Handshake: Tell parent we're ready for wallet === */
+window.opener?.postMessage?.({ type: "READY_FOR_WALLET" }, "*");
+
 /* ======== Core Game System (v4) ======== */
 const MAX_HP=200, MAX_MP=50, SPECIAL_COST=40, HEAL_COST=30, HEAL_HP=20;
 let playerHP=MAX_HP, playerMP=MAX_MP, enemyHP=MAX_HP, enemyMP=MAX_MP;
