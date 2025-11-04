@@ -137,6 +137,11 @@
         if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
 
         const data = event.data || {};
+        if (data.type === "READY_FOR_WALLET") {
+          console.log("🎮 RPG ready, sending wallet...");
+          gameWindow?.postMessage({ type: "CONNECT_WALLET", address: connectedAddress }, "*");
+        }
+
         if (data.type === "WALLET_RECEIVED") {
           console.log("✅ RPG confirmed wallet address received");
           showToast("🎮 Wallet connected in game!");
