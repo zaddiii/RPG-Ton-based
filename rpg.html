@@ -3,7 +3,6 @@
 
 
 
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -15,23 +14,18 @@
     body { background-color: #001f3f; font-family: "Times New Roman", serif; }
     .bar { transition: width 0.25s ease; }
     .bar-text { position: absolute; top: 50%; transform: translateY(-50%); right: 6px; }
-    .toast {
-      position: fixed; top: 20px; right: 20px;
-      background: #1a1c28; color: #fff; padding: 15px 20px;
-      border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-      opacity: 0; transform: translateY(-20px);
-      transition: opacity 0.4s ease, transform 0.4s ease; z-index: 9999;
-      font-weight: 500;
-    }
-    .toast.show { opacity: 1; transform: translateY(0); }
-    .meta { font-size:13px; color:#cbd5e1; margin-bottom:8px; text-align:center; }
-    .addr { word-break: break-all; color:#8be9fd; font-weight:600; }
+    .meta { font-size: 13px; color: #cbd5e1; margin-bottom: 8px; text-align: center; }
+    .addr { word-break: break-all; color: #8be9fd; font-weight: 600; }
     #connectedAddr { display: none; }
   </style>
 </head>
 
 <body class="text-white flex flex-col items-center min-h-screen p-2 sm:p-4 md:p-6 overflow-x-hidden">
   <h1 class="text-xl sm:text-2xl md:text-3xl font-bold mt-4 mb-2 text-center">RPG Battle Arena</h1>
+
+  <div class="meta">
+    Connected address: <span id="connectedAddr" class="addr">— waiting from parent —</span><br/>
+  </div>
 
   <div id="scoreboard" class="fixed top-3 left-3 bg-blue-950/80 p-3 rounded-xl shadow-lg text-xs w-[130px] sm:w-[150px]">
     <p><strong>Player Wins:</strong> <span id="playerWins">0</span></p>
@@ -40,12 +34,9 @@
     <p><strong>AI IQ:</strong> <span id="aiIQ">0</span></p>
   </div>
 
-  <div class="meta">
-    Connected address: <span id="connectedAddr" class="addr">— waiting from parent —</span><br/>
-  </div>
-
   <div id="gameArea" class="hidden flex justify-center w-full mt-4">
     <div class="bg-blue-950/30 rounded-2xl shadow-xl p-4 sm:p-5 w-full max-w-3xl flex flex-col gap-4">
+      <!-- Player -->
       <div>
         <p class="text-lg sm:text-xl font-semibold text-center">🧑‍🎮 Player</p>
         <div class="relative bg-gray-800 rounded-lg h-4 w-full overflow-hidden my-2">
@@ -58,6 +49,7 @@
         </div>
       </div>
 
+      <!-- Enemy -->
       <div>
         <p class="text-lg sm:text-xl font-semibold text-center">👾 Enemy</p>
         <div class="relative bg-gray-800 rounded-lg h-4 w-full overflow-hidden my-2">
@@ -74,6 +66,7 @@
         </div>
       </div>
 
+      <!-- Controls -->
       <div class="flex flex-wrap justify-center gap-2">
         <button id="attackBtn" class="bg-red-600 px-3 sm:px-4 py-2 rounded-xl font-bold text-sm sm:text-base flex-1 min-w-[80px]">Attack</button>
         <button id="defendBtn" class="bg-gray-600 px-3 sm:px-4 py-2 rounded-xl font-bold text-sm sm:text-base flex-1 min-w-[80px]">Defend</button>
@@ -86,39 +79,17 @@
     </div>
   </div>
 
-  <div id="toast" class="toast"></div>
-
   <button id="startBtn" class="mt-4 sm:mt-6 px-6 py-3 sm:px-8 sm:py-4 bg-emerald-600 hover:bg-emerald-700 rounded-2xl text-white font-bold text-base sm:text-lg shadow-lg">
     Start Game
   </button>
 
 <script>
-/* ========= Wallet & parent message handling ========= */
+/* ======== Wallet & Parent Messaging ======== */
 const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/api/reward";
 let connectedAddress = null;
 let parentWindowRef = null;
 let parentOrigin = null;
 
-const connectedAddrEl = document.getElementById("connectedAddr");
-const toast = document.getElementById("toast");
-const battleLog = document.getElementById("battleLog");
-const gameArea = document.getElementById("gameArea");
-const startBtn = document.getElementById("startBtn");
-
-function showToast(msg) {
-  toast.innerText = msg;
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2500);
-}
-
-function log(msg) {
-  const p = document.createElement("p");
-  p.innerText = msg;
-  battleLog.appendChild(p);
-  battleLog.scrollTop = battleLog.scrollHeight;
-}
-
-// 🔹 Receive wallet from parent
 window.addEventListener("message", (ev) => {
   const allowed = ["https://zaddiii.github.io", "http://localhost:5500", "http://localhost:3000"];
   const okOrigin = allowed.some((a) => ev.origin.startsWith(a));
@@ -132,49 +103,187 @@ window.addEventListener("message", (ev) => {
 
   if (data.type === "CONNECT_WALLET" && data.address) {
     connectedAddress = data.address;
-    connectedAddrEl.textContent = connectedAddress;
-    log("✅ Wallet connected: " + connectedAddress);
-    showToast("Wallet connected!");
-    try {
-      parentWindowRef?.postMessage?.({ type: "WALLET_RECEIVED" }, parentOrigin || "*");
-    } catch (e) {}
+    document.getElementById("connectedAddr").textContent = connectedAddress;
+    console.log("✅ Wallet received from parent:", connectedAddress);
+    parentWindowRef?.postMessage?.({ type: "WALLET_RECEIVED" }, parentOrigin);
   }
 });
 
-/* ========= Start Game ========= */
-startBtn.addEventListener("click", () => {
-  gameArea.classList.remove("hidden");
-  startBtn.style.display = "none";
-  log("🎮 Game started!");
-  showToast("Game started!");
-});
+/* ======== Core Game System (v4) ======== */
+const MAX_HP=200, MAX_MP=50, SPECIAL_COST=40, HEAL_COST=30, HEAL_HP=20;
+let playerHP=MAX_HP, playerMP=MAX_MP, enemyHP=MAX_HP, enemyMP=MAX_MP;
+let enemyIQ=0, enemyDefending=false, playerDefending=false;
+let scores={player:0, enemy:0, score:0};
+let aiInterval=null, aiActive=false;
 
-/* ========= Reward Logic ========= */
-async function sendReward() {
-  if (!connectedAddress) {
-    log("⚠️ No wallet connected — reward skipped.");
-    showToast("No wallet connected!");
+const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const log=t=>{const p=document.createElement('p'); p.innerText=t; battleLog.appendChild(p); battleLog.scrollTop=battleLog.scrollHeight;};
+
+function updateBars(){
+  playerHealthBar.style.width=(playerHP/MAX_HP*100)+'%';
+  playerManaBar.style.width=(playerMP/MAX_MP*100)+'%';
+  enemyHealthBar.style.width=(enemyHP/MAX_HP*100)+'%';
+  enemyManaBar.style.width=(enemyMP/MAX_MP*100)+'%';
+  playerHealthText.innerText=`${playerHP}/${MAX_HP}`;
+  playerManaText.innerText=`${playerMP}/${MAX_MP}`;
+  enemyHealthText.innerText=`${enemyHP}/${MAX_HP}`;
+  enemyManaText.innerText=`${enemyMP}/${MAX_MP}`;
+  enemyIntelligenceBar.style.width=enemyIQ+'%';
+  enemyIntelligenceText.innerText=`IQ ${enemyIQ.toFixed(1)}`;
+  if(enemyIQ<30) enemyIntelligenceBar.style.background="#44f";
+  else if(enemyIQ<80) enemyIntelligenceBar.style.background="#ffb300";
+  else if(enemyIQ<95) enemyIntelligenceBar.style.background="#ff6600";
+  else enemyIntelligenceBar.style.background="#0f0";
+}
+
+function updateScoreboard(){
+  playerWins.innerText=scores.player;
+  enemyWins.innerText=scores.enemy;
+  score.innerText=scores.score;
+  aiIQ.innerText=enemyIQ.toFixed(1);
+}
+
+function decideAction(){
+  let actions=['Attack','Defend','Heal','Special'];
+  if(enemyMP<HEAL_COST) actions=actions.filter(a=>a!=='Heal');
+  if(enemyMP<SPECIAL_COST) actions=actions.filter(a=>a!=='Special');
+
+  if(enemyIQ<20) return actions[randInt(0,actions.length-1)];
+
+  if(enemyHP < MAX_HP * 0.6 && enemyMP >= HEAL_COST) return 'Heal';
+  if(playerHP > MAX_HP * 0.3 && enemyMP >= SPECIAL_COST) return 'Special';
+  if(Math.random() < 0.3) return 'Defend';
+  return 'Attack';
+}
+
+function getAISpeed(){
+  if(enemyIQ<50) return 350;
+  if(enemyIQ<80) return 300;
+  return 250;
+}
+
+function enemyAction(){
+  if(!aiActive) return;
+  if(playerHP<=0 || enemyHP<=0) return;
+  const action=decideAction();
+  if(action==='Attack'){
+    const dmg=randInt(18,35);
+    const actual=playerDefending?Math.floor(dmg/2):dmg;
+    playerHP=clamp(playerHP-actual,0,MAX_HP);
+    log(`Enemy attacks → ${actual} dmg.`);
+  } else if(action==='Defend'){
+    enemyDefending=true; log('Enemy defends.');
+  } else if(action==='Special' && enemyMP>=SPECIAL_COST){
+    enemyMP-=SPECIAL_COST;
+    const dmg=randInt(15,40);
+    playerHP=clamp(playerHP-dmg,0,MAX_HP);
+    log(`Enemy unleashes Special → ${dmg} dmg!`);
+  } else if(action==='Heal' && enemyMP>=HEAL_COST){
+    enemyMP-=HEAL_COST;
+    enemyHP=clamp(enemyHP+HEAL_HP,0,MAX_HP);
+    log('Enemy heals +20 HP.');
+  }
+  checkEnd();
+  updateBars();
+}
+
+function playerAction(act){
+  if(!aiActive){ aiActive=true; startAI(); log("AI engages after your first move!"); }
+  playerDefending=false;
+  if(act==='Attack'){
+    const dmg=randInt(12,28);
+    const actual=enemyDefending?Math.floor(dmg/2):dmg;
+    enemyHP=clamp(enemyHP-actual,0,MAX_HP);
+    log(`Player attacks → ${actual} dmg.`);
+  } else if(act==='Defend'){
+    playerDefending=true; log('Player defends.');
+  } else if(act==='Special'){
+    if(playerMP<SPECIAL_COST){ log('Not enough mana.'); return; }
+    playerMP-=SPECIAL_COST;
+    const dmg=randInt(15,40);
+    const actual=enemyDefending?Math.floor(dmg/2):dmg;
+    enemyHP=clamp(enemyHP-actual,0,MAX_HP);
+    log(`Player uses Special → ${actual} dmg.`);
+  } else if(act==='Heal'){
+    if(playerMP<HEAL_COST){ log('Not enough mana.'); return; }
+    playerMP-=HEAL_COST;
+    playerHP=clamp(playerHP+HEAL_HP,0,MAX_HP);
+    log('Player heals +20 HP.');
+  }
+  updateBars();
+  checkEnd();
+}
+
+function checkEnd(){
+  if(playerHP<=0 || enemyHP<=0){
+    clearInterval(aiInterval); aiActive=false;
+    if(enemyHP<=0 && playerHP<=0) log('Double KO!');
+    else if(enemyHP<=0){ 
+      log('Player wins!'); 
+      scores.player++; 
+      scores.score+=50; 
+      enemyIQ+=1; 
+      sendReward(); 
+    } else { 
+      log('Enemy wins!'); 
+      scores.enemy++; 
+      scores.score=Math.max(0,scores.score-30); 
+      enemyIQ+=0.5; 
+    }
+    enemyIQ=clamp(enemyIQ,0,100);
+    updateScoreboard();
+    setTimeout(resetGame,1000);
+  }
+}
+
+function resetGame(){
+  clearInterval(aiInterval); aiActive=false;
+  playerHP=enemyHP=MAX_HP; playerMP=enemyMP=MAX_MP;
+  enemyDefending=playerDefending=false;
+  updateBars(); updateScoreboard();
+  log('New round — AI will wait for your first move.');
+}
+
+function startAI(){
+  clearInterval(aiInterval);
+  aiInterval=setInterval(enemyAction,getAISpeed());
+}
+
+startBtn.onclick=()=>{
+  gameArea.classList.remove('hidden');
+  startBtn.classList.add('hidden');
+  resetGame();
+  log('Game started. You move first!');
+};
+
+attackBtn.onclick=()=>playerAction('Attack');
+defendBtn.onclick=()=>playerAction('Defend');
+specialBtn.onclick=()=>playerAction('Special');
+healBtn.onclick=()=>playerAction('Heal');
+resetBtn.onclick=resetGame;
+
+updateBars(); updateScoreboard();
+
+/* ======== Reward Call ======== */
+async function sendReward(){
+  if(!connectedAddress){ 
+    console.warn("No wallet connected — reward skipped."); 
     return;
   }
-  log("💰 Sending reward to backend...");
-  try {
-    const res = await fetch(BACKEND_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to: connectedAddress, amount: 50 }),
+  try{
+    const res=await fetch(BACKEND_URL,{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ to: connectedAddress, amount: 50 }),
     });
-    const json = await res.json().catch(() => null);
-    if (res.ok && json?.ok) {
+    const json=await res.json().catch(()=>null);
+    if(res.ok && json?.ok){
       log("✅ Reward sent successfully!");
-      showToast("Reward claimed!");
     } else {
-      log("❌ Reward failed: " + (json?.message || res.status));
-      showToast("Reward failed.");
+      log("❌ Reward failed: "+(json?.message||res.status));
     }
-  } catch (err) {
-    log("⚠️ Network error: " + err.message);
-    showToast("Network error.");
-  }
+  }catch(e){ log("⚠️ Network error: "+e.message); }
 }
 </script>
 </body>
