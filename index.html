@@ -1,7 +1,6 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -103,10 +102,18 @@
       if (walletInfo && walletInfo.account) {
         connectedAddress = walletInfo.account.address;
         console.log("✅ Connected wallet address:", connectedAddress);
+
+        // ✅ Save to localStorage (bonus trick)
+        localStorage.setItem("rpg_wallet", connectedAddress);
+
         walletInfoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${connectedAddress}</p>`;
         gameControlsDiv.style.display = "flex";
       } else {
         connectedAddress = null;
+
+        // 🧹 Remove from localStorage if disconnected
+        localStorage.removeItem("rpg_wallet");
+
         walletInfoDiv.innerHTML = "🔴 Wallet not connected";
         gameControlsDiv.style.display = "none";
       }
