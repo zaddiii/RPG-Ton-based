@@ -25,7 +25,6 @@
       background: #0d1117;
       color: #fff;
       padding: 20px;
-      position: relative;
     }
     #connect { margin-bottom: 20px; }
     button {
@@ -99,6 +98,7 @@
       }, 3000);
     }
 
+    // 🔗 Handle TON wallet connection
     tonConnectUI.onStatusChange(async (walletInfo) => {
       if (walletInfo && walletInfo.account) {
         connectedAddress = walletInfo.account.address;
@@ -112,6 +112,7 @@
       }
     });
 
+    // 🎮 Open RPG game and send wallet address only
     playBtn.addEventListener("click", () => {
       if (!connectedAddress) return showToast("⚠️ Connect your wallet first!");
       if (gameWindow && !gameWindow.closed) return showToast("⚠️ Game already open!");
@@ -119,7 +120,7 @@
       playBtn.disabled = true;
       gameWindow = window.open("rpg.html", "_blank", "noopener,noreferrer");
 
-      // ✅ Keep retrying until RPG confirms receipt of wallet
+      // 🔁 Retry sending wallet to RPG until confirmed
       let retries = 0;
       const sendWalletToGame = setInterval(() => {
         if (!gameWindow || gameWindow.closed || retries >= 10) {
@@ -127,6 +128,7 @@
           return;
         }
         console.log(`📨 Sending wallet to RPG attempt #${retries + 1}:`, connectedAddress);
+        // ✅ Only sending wallet address — NOT backend URL
         gameWindow.postMessage({ type: "CONNECT_WALLET", address: connectedAddress }, "*");
         retries++;
       }, 1000);
@@ -181,7 +183,7 @@
       }, 500);
     });
 
-    // ✅ Backend test
+    // ✅ Quick backend test on load
     fetch(BACKEND_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
