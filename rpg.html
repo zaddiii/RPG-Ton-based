@@ -42,7 +42,6 @@
 
   <div class="meta">
     Connected address: <span id="connectedAddr" class="addr">— waiting from parent —</span><br/>
-    Backend: <span id="backendUrl" class="addr">https://rpg-backend-gocj.onrender.com/api/reward</span>
   </div>
 
   <div id="gameArea" class="hidden flex justify-center w-full mt-4">
@@ -120,10 +119,9 @@ const enemyWins=document.getElementById('enemyWins');
 const score=document.getElementById('score');
 const aiIQ=document.getElementById('aiIQ');
 const connectedAddrEl=document.getElementById('connectedAddr');
-const backendEl=document.getElementById('backendUrl');
 
-let backendUrl="https://rpg-backend-gocj.onrender.com/api/reward";
 let connectedAddress=null;
+const BACKEND_URL="https://rpg-backend-gocj.onrender.com/api/reward"; // Fixed backend URL
 let parentWindowRef=null;
 let parentOrigin=null;
 
@@ -136,43 +134,62 @@ let aiInterval=null,aiActive=false;
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const log=t=>{const p=document.createElement('p');p.innerText=t;battleLog.appendChild(p);battleLog.scrollTop=battleLog.scrollHeight;};
-
 function showToast(msg){toast.innerText=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2500);}
 
+// 🔹 Receive wallet address from parent (only)
 window.addEventListener('message',(ev)=>{
   const allowed=["https://zaddiii.github.io","http://localhost:5500","http://localhost:3000"];
   const okOrigin=(ev.origin===window.origin)||allowed.some(a=>ev.origin.startsWith(a));
   if(!okOrigin)return;
   const data=ev.data||{};
   if(ev.source){parentWindowRef=ev.source;parentOrigin=ev.origin||"*";}
-  if(data.type==="CONNECT_WALLET"||data.type==="PARENT_ADDRESS"){
-    if(data.address){connectedAddress=data.address;}
-    if(data.backend){backendUrl=data.backend;backendEl.innerText=backendUrl;}else{backendEl.innerText=backendUrl;}
-    try{parentWindowRef?.postMessage?.({type:"WALLET_RECEIVED",address:connectedAddress},parentOrigin||"*");}catch(e){}
-    log("Received wallet message.");
+  if(data.type==="CONNECT_WALLET" && data.address){
+    connectedAddress=data.address;
+    connectedAddrEl.textContent=connectedAddress;
+    log("✅ Wallet address received from parent.");
+    try{
+      parentWindowRef?.postMessage?.({type:"WALLET_RECEIVED",address:connectedAddress},parentOrigin||"*");
+    }catch(e){}
   }
-  if(data.type==="REQUEST_STATUS"){
-    try{parentWindowRef?.postMessage?.({type:"STATUS",address:connectedAddress,backend:backendUrl},parentOrigin||"*");}catch(e){}
-  }
-  if(data.type==="FORCE_CLAIM"){sendReward();}
 });
 
-function requestAddressFromOpener(){try{if(window.opener&&!window.opener.closed){window.opener.postMessage({type:"REQUEST_PARENT_ADDRESS"},"*");}}catch(e){}}
-setTimeout(requestAddressFromOpener,200);
+// 🔹 Request wallet if opener didn’t send it yet
+function requestAddressFromOpener(){
+  try{
+    if(window.opener && !window.opener.closed){
+      window.opener.postMessage({type:"REQUEST_PARENT_ADDRESS"},"*");
+    }
+  }catch(e){}
+}
+setTimeout(requestAddressFromOpener,300);
 
+// 🔹 Reward logic (uses fixed backend URL)
 async function sendReward(){
-  if(!connectedAddress){log("No address, abort reward.");showToast("No connected address.");return;}
+  if(!connectedAddress){
+    log("⚠️ No wallet address connected, reward skipped.");
+    showToast("No wallet address connected!");
+    return;
+  }
   const payload={to:connectedAddress,amount:50};
   showToast("Claiming reward...");
   try{
-    const res=await fetch(backendUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    let json=null;try{json=await res.json();}catch(e){}
-    if(res.ok&&json&&json.ok){showToast("Reward requested ✓");}
-    else{showToast("Reward failed");}
-  }catch(e){showToast("Network error");}
+    const res=await fetch(BACKEND_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const json=await res.json().catch(()=>null);
+    if(res.ok && json?.ok){
+      showToast("✅ Reward requested successfully!");
+    } else {
+      showToast("❌ Reward failed.");
+    }
+  }catch(e){
+    showToast("⚠️ Network error.");
+  }
 }
 
-/* ============ Game Logic (unchanged) ============ */
+/* ============ Game Logic ============ */
 function updateBars(){playerHealthBar.style.width=(playerHP/MAX_HP*100)+'%';playerManaBar.style.width=(playerMP/MAX_MP*100)+'%';enemyHealthBar.style.width=(enemyHP/MAX_HP*100)+'%';enemyManaBar.style.width=(enemyMP/MAX_MP*100)+'%';playerHealthText.innerText=`${playerHP}/${MAX_HP}`;playerManaText.innerText=`${playerMP}/${MAX_MP}`;enemyHealthText.innerText=`${enemyHP}/${MAX_HP}`;enemyManaText.innerText=`${enemyMP}/${MAX_MP}`;enemyIntelligenceBar.style.width=enemyIQ+'%';enemyIntelligenceText.innerText=`IQ ${enemyIQ.toFixed(1)}`;}
 function updateScoreboard(){playerWins.innerText=scores.player;enemyWins.innerText=scores.enemy;score.innerText=scores.score;aiIQ.innerText=enemyIQ.toFixed(1);}
 function decideAction(){let actions=['Attack','Defend','Heal','Special'];if(enemyMP<HEAL_COST)actions=actions.filter(a=>a!=='Heal');if(enemyMP<SPECIAL_COST)actions=actions.filter(a=>a!=='Special');return actions[randInt(0,actions.length-1)];}
