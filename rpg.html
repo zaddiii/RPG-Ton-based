@@ -91,7 +91,7 @@ let parentWindowRef = null;
 let parentOrigin = null;
 
 window.addEventListener("message", (ev) => {
-  const allowed = ["https://zaddiii.github.io", "http://localhost:5500", "http://localhost:3000"];
+  const allowed = ["https://zaddiii.github.io/RPG-Ton-based/", "http://localhost:5500", "http://localhost:3000"];
   const okOrigin = allowed.some((a) => ev.origin.startsWith(a));
   if (!okOrigin) return;
 
