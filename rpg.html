@@ -1,8 +1,6 @@
 
 
 
-
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -10,6 +8,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RPG Game — God AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- ✅ Added TonConnect SDK CDN -->
+  <script src="https://unpkg.com/@tonconnect/sdk@2.1.1/dist/tonconnect-sdk.min.js"></script>
   <style>
     body { background-color: #001f3f; font-family: "Times New Roman", serif; }
     .bar { transition: width 0.25s ease; }
@@ -84,40 +84,43 @@
   </button>
 
 <script>
-import { TonConnect } from "@tonconnect/sdk";
+/* ✅ FIXED WALLET DETECTION SECTION */
+let connectedAddress = null;
+const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/api/reward";
+const connectedAddrEl = document.getElementById("connectedAddr");
 
-const tonConnect = new TonConnect({
-  manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
-});
-
-async function getWalletAddress() {
-  const wallet = tonConnect.wallet;
-  if (wallet && wallet.account) {
-    connectedAddress = wallet.account.address;
-    console.log("✅ Connected wallet (direct):", connectedAddress);
-    document.getElementById("connectedAddr").textContent = connectedAddress;
-  } else {
-    console.log("⚠️ No wallet connected in TonConnect session.");
+async function initTonConnect() {
+  try {
+    const tonConnect = new TON_CONNECT_SDK.TonConnect({
+      manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
+    });
+    const wallet = tonConnect.wallet;
+    if (wallet && wallet.account) {
+      connectedAddress = wallet.account.address;
+      connectedAddrEl.textContent = connectedAddress;
+      connectedAddrEl.style.display = "inline";
+      console.log("✅ Connected wallet (TonConnect):", connectedAddress);
+    } else {
+      console.log("⚠️ No TonConnect wallet active — waiting for parent message...");
+    }
+  } catch (err) {
+    console.warn("TonConnect init failed:", err.message);
   }
 }
+initTonConnect();
 
-getWalletAddress();
-
-/* ======== Wallet & Parent Messaging ======== */
-const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/api/reward";
-let connectedAddress = null;
+/* ======== Parent Messaging ======== */
 let parentWindowRef = null;
 let parentOrigin = null;
 
 window.addEventListener("message", (ev) => {
   const allowed = [
-  "https://zaddiii.github.io",
-  "https://zaddiii.github.io/RPG-Ton-based",
-  "http://localhost:5500",
-  "http://localhost:3000"
-];
-  const okOrigin = allowed.some((a) => ev.origin.startsWith(a));
-  if (!okOrigin) return;
+    "https://zaddiii.github.io",
+    "https://zaddiii.github.io/RPG-Ton-based",
+    "http://localhost:5500",
+    "http://localhost:3000"
+  ];
+  if (!allowed.some(a => ev.origin.startsWith(a))) return;
 
   const data = ev.data || {};
   if (ev.source) {
@@ -127,16 +130,16 @@ window.addEventListener("message", (ev) => {
 
   if (data.type === "CONNECT_WALLET" && data.address) {
     connectedAddress = data.address;
-    document.getElementById("connectedAddr").textContent = connectedAddress;
+    connectedAddrEl.textContent = connectedAddress;
+    connectedAddrEl.style.display = "inline";
     console.log("✅ Wallet received from parent:", connectedAddress);
     parentWindowRef?.postMessage?.({ type: "WALLET_RECEIVED" }, parentOrigin);
   }
 });
 
-/* === Handshake: Tell parent we're ready for wallet === */
 window.opener?.postMessage?.({ type: "READY_FOR_WALLET" }, "*");
 
-/* ======== Core Game System (v4) ======== */
+/* ======== Core Game System (Unchanged) ======== */
 const MAX_HP=200, MAX_MP=50, SPECIAL_COST=40, HEAL_COST=30, HEAL_HP=20;
 let playerHP=MAX_HP, playerMP=MAX_MP, enemyHP=MAX_HP, enemyMP=MAX_MP;
 let enemyIQ=0, enemyDefending=false, playerDefending=false;
@@ -175,9 +178,7 @@ function decideAction(){
   let actions=['Attack','Defend','Heal','Special'];
   if(enemyMP<HEAL_COST) actions=actions.filter(a=>a!=='Heal');
   if(enemyMP<SPECIAL_COST) actions=actions.filter(a=>a!=='Special');
-
   if(enemyIQ<20) return actions[randInt(0,actions.length-1)];
-
   if(enemyHP < MAX_HP * 0.6 && enemyMP >= HEAL_COST) return 'Heal';
   if(playerHP > MAX_HP * 0.3 && enemyMP >= SPECIAL_COST) return 'Special';
   if(Math.random() < 0.3) return 'Defend';
@@ -312,9 +313,6 @@ async function sendReward(){
     }
   }catch(e){ log("⚠️ Network error: "+e.message); }
 }
-
-// ✅ Let parent know this page is ready to receive wallet
-window.opener?.postMessage?.({ type: "READY_FOR_WALLET" }, "*");
 </script>
 </body>
 </html>
