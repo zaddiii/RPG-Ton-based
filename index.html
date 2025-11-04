@@ -2,6 +2,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -127,6 +128,15 @@
 
       playBtn.disabled = true;
       gameWindow = window.open("rpg.html", "_blank", "noopener,noreferrer");
+
+      // ✅ Send connected wallet to the game page once it's open
+      setTimeout(() => {
+        gameWindow.postMessage(
+          { type: "CONNECT_WALLET", address: connectedAddress },
+          "*"
+        );
+        console.log("📨 Sent wallet to RPG game:", connectedAddress);
+      }, 1000);
 
       const onMessage = async (event) => {
         if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
