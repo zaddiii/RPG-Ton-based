@@ -2,7 +2,6 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,9 +27,7 @@
       padding: 20px;
       position: relative;
     }
-    #connect {
-      margin-bottom: 20px;
-    }
+    #connect { margin-bottom: 20px; }
     button {
       background: #007bff;
       border: none;
@@ -42,10 +39,7 @@
       margin: 10px;
       transition: 0.2s;
     }
-    button:disabled {
-      background: #555;
-      cursor: not-allowed;
-    }
+    button:disabled { background: #555; cursor: not-allowed; }
     #walletInfo {
       margin-top: 20px;
       text-align: center;
@@ -66,10 +60,7 @@
       z-index: 9999;
       font-weight: 500;
     }
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    .toast.show { opacity: 1; transform: translateY(0); }
   </style>
 </head>
 
@@ -84,7 +75,6 @@
 
   <script type="module">
     const BACKEND_URL = "https://rpg-backend-gocj.onrender.com/api/reward";
-
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
     });
@@ -129,17 +119,25 @@
       playBtn.disabled = true;
       gameWindow = window.open("rpg.html", "_blank", "noopener,noreferrer");
 
-      // ✅ Send connected wallet to the game page once it's open
-      setTimeout(() => {
-        gameWindow.postMessage(
-          { type: "CONNECT_WALLET", address: connectedAddress },
-          "*"
-        );
-        console.log("📨 Sent wallet to RPG game:", connectedAddress);
+      // ✅ Keep retrying until RPG confirms receipt of wallet
+      let retries = 0;
+      const sendWalletToGame = setInterval(() => {
+        if (!gameWindow || gameWindow.closed || retries >= 10) {
+          clearInterval(sendWalletToGame);
+          return;
+        }
+        console.log(`📨 Sending wallet to RPG attempt #${retries + 1}:`, connectedAddress);
+        gameWindow.postMessage({ type: "CONNECT_WALLET", address: connectedAddress }, "*");
+        retries++;
       }, 1000);
 
       const onMessage = async (event) => {
         if (!event.origin.includes("github.io") && !event.origin.includes("localhost")) return;
+
+        if (event.data === "WALLET_RECEIVED") {
+          console.log("✅ RPG confirmed wallet address received");
+          clearInterval(sendWalletToGame);
+        }
 
         if (event.data === "WIN") {
           showToast("🎉 Victory detected! Claiming reward...");
@@ -183,15 +181,15 @@
       }, 500);
     });
 
-    // ✅ Simple live test for backend connection
-    fetch("https://rpg-backend-gocj.onrender.com/api/reward", {
+    // ✅ Backend test
+    fetch(BACKEND_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to: "test_user", score: 100 }),
     })
-    .then(res => res.json())
-    .then(data => console.log("Response from backend:", data))
-    .catch(err => console.error("Failed to fetch:", err));
+      .then(res => res.json())
+      .then(data => console.log("Response from backend:", data))
+      .catch(err => console.error("Failed to fetch:", err));
   </script>
 </body>
 </html>
