@@ -2,6 +2,8 @@
 
 
 
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,7 +31,7 @@
     }
 
     #connect {
-      margin-bottom: 20px;
+      margin-bottom: 30px;
     }
 
     button {
@@ -47,26 +49,6 @@
     button:disabled {
       background: #555;
       cursor: not-allowed;
-    }
-
-    #walletInfo {
-      margin-top: 20px;
-      text-align: center;
-      font-size: 15px;
-      max-width: 90%;
-      overflow-wrap: break-word;
-      word-break: normal;
-      line-height: 1.4em;
-    }
-
-    #walletAddress {
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.08);
-      padding: 6px 10px;
-      border-radius: 6px;
-      margin-top: 6px;
-      font-family: monospace;
-      font-size: 14px;
     }
 
     .toast {
@@ -95,7 +77,6 @@
 <body>
   <h2>🎮 RPG TON Battle Arena</h2>
   <div id="connect"></div>
-  <div id="walletInfo">🔴 Wallet not connected</div>
 
   <div id="gameControls" style="display:none; flex-direction: column; align-items: center;">
     <button id="playRPG">🎮 Play RPG</button>
@@ -111,7 +92,6 @@
     });
     tonConnectUI.uiOptions = { language: "en", buttonRootId: "connect" };
 
-    const walletInfoDiv = document.getElementById("walletInfo");
     const gameControlsDiv = document.getElementById("gameControls");
     const playBtn = document.getElementById("playRPG");
 
@@ -136,15 +116,9 @@
       if (walletInfo && walletInfo.account) {
         connectedAddress = walletInfo.account.address;
         console.log("✅ Connected wallet address:", connectedAddress);
-
-        walletInfoDiv.innerHTML = `
-          ✅ Connected Wallet:
-          <div id="walletAddress">${connectedAddress}</div>
-        `;
         gameControlsDiv.style.display = "flex";
       } else {
         connectedAddress = null;
-        walletInfoDiv.innerHTML = "🔴 Wallet not connected";
         gameControlsDiv.style.display = "none";
       }
     });
