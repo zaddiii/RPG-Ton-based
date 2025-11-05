@@ -2,8 +2,6 @@
 
 
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,8 +25,13 @@
       background: #0d1117;
       color: #fff;
       padding: 20px;
+      text-align: center;
     }
-    #connect { margin-bottom: 20px; }
+
+    #connect {
+      margin-bottom: 20px;
+    }
+
     button {
       background: #007bff;
       border: none;
@@ -40,12 +43,32 @@
       margin: 10px;
       transition: 0.2s;
     }
-    button:disabled { background: #555; cursor: not-allowed; }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+
     #walletInfo {
       margin-top: 20px;
       text-align: center;
-      word-break: break-all;
+      font-size: 15px;
+      max-width: 90%;
+      overflow-wrap: break-word;
+      word-break: normal;
+      line-height: 1.4em;
     }
+
+    #walletAddress {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 6px 10px;
+      border-radius: 6px;
+      margin-top: 6px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+
     .toast {
       position: fixed;
       top: 20px;
@@ -61,7 +84,11 @@
       z-index: 9999;
       font-weight: 500;
     }
-    .toast.show { opacity: 1; transform: translateY(0); }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
   </style>
 </head>
 
@@ -77,7 +104,6 @@
   <script type="module">
     // 🔹 Backend API base URL (Render deployment)
     const BACKEND_URL = "https://rpg-backend-gocj.onrender.com"; 
-    // ⬆️ Replace with your actual Render URL after deployment
 
     // 🔹 Initialize TON Connect UI
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
@@ -92,7 +118,7 @@
     let connectedAddress = null;
     let gameWindow = null;
 
-    // 🔔 Small toast notification
+    // 🔔 Toast
     function showToast(message) {
       const toast = document.createElement("div");
       toast.className = "toast";
@@ -111,7 +137,10 @@
         connectedAddress = walletInfo.account.address;
         console.log("✅ Connected wallet address:", connectedAddress);
 
-        walletInfoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${connectedAddress}</p>`;
+        walletInfoDiv.innerHTML = `
+          ✅ Connected Wallet:
+          <div id="walletAddress">${connectedAddress}</div>
+        `;
         gameControlsDiv.style.display = "flex";
       } else {
         connectedAddress = null;
@@ -120,7 +149,7 @@
       }
     });
 
-    // 🎮 Launch RPG page (no wallet message sending)
+    // 🎮 Launch RPG
     playBtn.addEventListener("click", () => {
       if (!connectedAddress) return showToast("⚠️ Connect your wallet first!");
       if (gameWindow && !gameWindow.closed) return showToast("⚠️ Game already open!");
