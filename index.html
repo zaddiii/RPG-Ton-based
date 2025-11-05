@@ -1,6 +1,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -113,7 +114,7 @@
         connectedAddress = walletInfo.account.address;
         console.log("✅ Connected wallet address:", connectedAddress);
 
-        // ✅ Save wallet for RPG to use
+        // ✅ Save wallet for RPG to use later
         localStorage.setItem("rpg_wallet", connectedAddress);
 
         walletInfoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${connectedAddress}</p>`;
@@ -127,52 +128,14 @@
       }
     });
 
-    // 🎮 Launch RPG page + send wallet via postMessage
+    // 🎮 Launch RPG page (no wallet message sending)
     playBtn.addEventListener("click", () => {
       if (!connectedAddress) return showToast("⚠️ Connect your wallet first!");
       if (gameWindow && !gameWindow.closed) return showToast("⚠️ Game already open!");
 
       playBtn.disabled = true;
-      // ✅ Full URL to RPG file (important for GitHub Pages)
       const gameUrl = "https://zaddiii.github.io/RPG-Ton-based/rpg.html";
       gameWindow = window.open(gameUrl, "_blank", "noopener,noreferrer");
-
-      let retries = 0;
-      const sendWalletToGame = setInterval(() => {
-        if (!gameWindow || gameWindow.closed || retries >= 10) {
-          clearInterval(sendWalletToGame);
-          return;
-        }
-        console.log(`📨 Sending wallet to RPG attempt #${retries + 1}:`, connectedAddress);
-        gameWindow.postMessage({ type: "CONNECT_WALLET", address: connectedAddress }, "*");
-        retries++;
-      }, 1000);
-
-      const onMessage = (event) => {
-        // Allow messages only from same GitHub Pages domain
-        if (!event.origin.includes("zaddiii.github.io")) return;
-
-        const data = event.data || {};
-        if (data.type === "READY_FOR_WALLET") {
-          console.log("🎮 RPG ready, sending wallet...");
-          gameWindow?.postMessage({ type: "CONNECT_WALLET", address: connectedAddress }, "*");
-        }
-
-        if (data.type === "WALLET_RECEIVED") {
-          console.log("✅ RPG confirmed wallet address received");
-          showToast("🎮 Wallet connected in game!");
-          clearInterval(sendWalletToGame);
-        }
-
-        if (data.type === "WIN") {
-          showToast("🎉 Victory detected! Reward will be handled by RPG backend.");
-          console.log("🏆 WIN signal received from RPG (reward handled inside RPG)");
-          playBtn.disabled = false;
-          window.removeEventListener("message", onMessage);
-        }
-      };
-
-      window.addEventListener("message", onMessage);
 
       const checkGameClosed = setInterval(() => {
         if (gameWindow.closed) {
