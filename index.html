@@ -2,6 +2,8 @@
 
 
 
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,6 +75,10 @@
   </div>
 
   <script type="module">
+    // 🔹 Backend API base URL (Render deployment)
+    const BACKEND_URL = "https://rpg-backend-gocj.onrender.com"; 
+    // ⬆️ Replace with your actual Render URL after deployment
+
     // 🔹 Initialize TON Connect UI
     const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
       manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
@@ -99,30 +105,16 @@
       }, 3000);
     }
 
-    // 🧠 Restore wallet from localStorage on page load
-    const savedWallet = localStorage.getItem("rpg_wallet");
-    if (savedWallet) {
-      connectedAddress = savedWallet;
-      walletInfoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${connectedAddress}</p>`;
-      gameControlsDiv.style.display = "flex";
-      console.log("💾 Restored wallet from storage:", connectedAddress);
-    }
-
     // 🔗 Handle TON wallet connection
     tonConnectUI.onStatusChange(async (walletInfo) => {
       if (walletInfo && walletInfo.account) {
         connectedAddress = walletInfo.account.address;
         console.log("✅ Connected wallet address:", connectedAddress);
 
-        // ✅ Save wallet for RPG to use later
-        localStorage.setItem("rpg_wallet", connectedAddress);
-
         walletInfoDiv.innerHTML = `<p>✅ Connected Wallet:</p><p>${connectedAddress}</p>`;
         gameControlsDiv.style.display = "flex";
       } else {
         connectedAddress = null;
-        localStorage.removeItem("rpg_wallet");
-
         walletInfoDiv.innerHTML = "🔴 Wallet not connected";
         gameControlsDiv.style.display = "none";
       }
