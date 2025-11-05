@@ -4,15 +4,12 @@
 
 
 
-
-
-
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>RPG Game v4</title>
+<title>RPG Game</title>
 <style>
   body {
     background-color: #001f3f;
@@ -24,7 +21,6 @@
     padding: 0;
   }
 
-  /* pure transparent scoreboard — only text visible */
   #scoreboard {
     position: fixed;
     top: 10px;
@@ -92,9 +88,8 @@
     cursor: pointer;
     transition: transform 0.15s ease;
   }
-  button:active {
-    transform: scale(0.97);
-  }
+  button:active { transform: scale(0.97); }
+
   #alertBox {
     position: fixed;
     top: 20px;
@@ -114,45 +109,17 @@
   #alertBox.show { opacity: 1; }
 
   @media (max-width: 600px) {
-    h1 {
-      font-size: 20px;
-      margin-top: 15px;
-    }
-    #scoreboard {
-      font-size: 12px;
-      top: 5px;
-      left: 5px;
-    }
-    #gameArea {
-      padding: 10px;
-      border-radius: 10px;
-    }
-    button {
-      font-size: 12px;
-      padding: 6px 10px;
-      margin: 3px;
-    }
-    #battleLog {
-      font-size: 12px;
-      height: 120px;
-    }
-    #alertBox {
-      font-size: 12px;
-      padding: 8px 16px;
-    }
+    h1 { font-size: 20px; margin-top: 15px; }
+    #scoreboard { font-size: 12px; top: 5px; left: 5px; }
+    #gameArea { padding: 10px; border-radius: 10px; }
+    button { font-size: 12px; padding: 6px 10px; margin: 3px; }
+    #battleLog { font-size: 12px; height: 120px; }
+    #alertBox { font-size: 12px; padding: 8px 16px; }
   }
 
   @media (max-width: 400px) {
-    #scoreboard {
-      font-size: 11px;
-      line-height: 1.2;
-    }
-    button {
-      width: 90%;
-      max-width: 220px;
-      display: block;
-      margin: 6px auto;
-    }
+    #scoreboard { font-size: 11px; line-height: 1.2; }
+    button { width: 90%; max-width: 220px; display: block; margin: 6px auto; }
   }
 </style>
 </head>
@@ -165,6 +132,7 @@
   <p><strong>Enemy Wins:</strong> <span id="enemyWins">0</span></p>
   <p><strong>Score:</strong> <span id="score">0</span></p>
   <p><strong>AI IQ:</strong> <span id="aiIQ">0</span></p>
+  <p><strong>💰 Wallet:</strong> <span id="walletBalance">0</span></p>
 </div>
 
 <div id="gameArea">
@@ -198,6 +166,7 @@
     <button onclick="playerAction('Special')">Special (-30 MP)</button>
     <button onclick="playerAction('Heal')">Heal (+20 HP, -20 MP)</button>
     <button onclick="resetGame()">Reset</button>
+    <button onclick="syncWalletWithBackend()">Sync Wallet</button>
   </div>
 
   <div id="battleLog"></div>
@@ -207,6 +176,7 @@
 <div id="alertBox"></div>
 
 <script>
+/* ✅ Original JavaScript */
 const MAX_HP = 200, MAX_MP = 50, SPECIAL_COST = 30, HEAL_COST = 20, HEAL_HP = 20;
 let scores = { player: 0, enemy: 0, score: 0 };
 let playerHP = MAX_HP, playerMP = MAX_MP, enemyHP = MAX_HP, enemyMP = MAX_MP;
@@ -242,6 +212,7 @@ function updateScoreboard(){
   enemyWins.innerText=scores.enemy;
   score.innerText=scores.score;
   aiIQ.innerText=enemyIQ.toFixed(1);
+  document.getElementById("walletBalance").innerText = wallet.tokens;
 }
 
 function decideAction(){
@@ -338,8 +309,23 @@ function checkEnd(){
     clearInterval(regenInterval);
     aiActive=false;
     if(enemyHP<=0&&playerHP<=0)showAlert('Double KO!');
-    else if(enemyHP<=0){showAlert('You Win!');scores.player++;scores.score+=50;enemyIQ+=1;}
-    else{showAlert('You Lose!');scores.enemy++;scores.score=Math.max(0,scores.score-30);enemyIQ+=0.5;}
+    else if(enemyHP<=0){
+      showAlert('You Win!');
+      scores.player++;
+      scores.score+=50;
+      enemyIQ+=1;
+
+      // 🪙 reward for win
+      const tokenReward = 1;
+      wallet.tokens += tokenReward;
+      saveWallet();
+      log(`🏆 You earned ${tokenReward} token! Wallet: ${wallet.tokens}`);
+    } else {
+      showAlert('You Lose!');
+      scores.enemy++;
+      scores.score=Math.max(0,scores.score-30);
+      enemyIQ+=0.5;
+    }
     enemyIQ=clamp(enemyIQ,0,100);
     updateScoreboard();
     setTimeout(()=>{roundOver=false;newRound();},1200);
@@ -386,6 +372,38 @@ function startGame(){
   showAlert("Welcome to the Arena ⚔!");
   log("Game started. You move first!");
 }
+
+/* === 🪙 WALLET SYSTEM === */
+let wallet = { tokens: 0 };
+const API_URL = "https://rpg-backend-gocj.onrender.com";
+
+function loadWallet() {
+  const saved = localStorage.getItem("rpgWallet");
+  if (saved) wallet = JSON.parse(saved);
+  updateScoreboard();
+}
+
+function saveWallet() {
+  localStorage.setItem("rpgWallet", JSON.stringify(wallet));
+  updateScoreboard();
+}
+
+async function syncWalletWithBackend() {
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(wallet),
+    });
+    const data = await res.json();
+    showAlert("Wallet synced with backend!");
+    log(`Backend sync success: ${JSON.stringify(data)}`);
+  } catch (err) {
+    log("⚠️ Could not sync wallet to backend.");
+  }
+}
+
+window.addEventListener("DOMContentLoaded", loadWallet);
 
 updateBars();
 updateScoreboard();
