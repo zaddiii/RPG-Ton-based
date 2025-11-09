@@ -4,6 +4,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -223,18 +224,21 @@ function connectWallet(){
   log(`Connected wallet: ${wallet.address}`);
 }
 
-/* ✅ Updated sync function — send tokens to connected wallet */
+/* ✅ Fixed sync function — matches backend /sync route and tokens param */
 async function syncWalletWithBackend(){
   if(!wallet.address){showAlert("Please connect your wallet first!");return;}
   if(wallet.tokens<=0){showAlert("No tokens to send!");return;}
   try{
-    const res=await fetch(`${API_URL}/reward`,{
+    const res=await fetch(`${API_URL}/sync`,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({toAddress:wallet.address,amount:wallet.tokens.toString()}),
+      body:JSON.stringify({
+        toAddress:wallet.address,
+        tokens:wallet.tokens.toString()
+      }),
     });
     const data=await res.json();
-    if(data.status==="ok"||data.success){
+    if(data.success){
       showAlert(`✅ Sent ${wallet.tokens} RPG tokens!`);
       log(`🪙 Tokens sent: ${wallet.tokens} to ${wallet.address}`);
       wallet.tokens=0;saveWallet();
