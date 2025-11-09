@@ -9,6 +9,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">  
 <head>  
@@ -121,7 +122,7 @@
   @media (max-width: 400px) {
     #scoreboard { font-size: 11px; line-height: 1.2; }
     button { width: 90%; max-width: 220px; display: block; margin: 6px auto; }
-    #ton-connect { transform: scale(0.75); } /* smaller button on mobile */
+    #ton-connect { transform: scale(0.75); }
   }
 </style>
 </head>  
@@ -137,7 +138,6 @@
   <p><strong>💰 Wallet:</strong> <span id="walletBalance">0</span></p>  
 </div>  
 
-<!-- ✅ Centered and resized TON CONNECT UI -->
 <div id="wallet-connect" style="margin-top:15px; text-align:center;">
   <div id="ton-connect" style="
     display:inline-block;
@@ -185,21 +185,19 @@
 </div>  
 
 <button id="startBtn" onclick="startGame()">Start Game</button>
-
 <div id="alertBox"></div>  
 
-<!-- ✅ TON CONNECT SDK + UI -->  
 <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>  
 <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>  
 
 <script>  
-/* === Your RPG logic (unchanged) === */  
+/* === RPG logic (unchanged) === */  
 const MAX_HP=200,MAX_MP=50,SPECIAL_COST=30,HEAL_COST=20,HEAL_HP=20;  
 let scores={player:0,enemy:0,score:0};  
 let playerHP=MAX_HP,playerMP=MAX_MP,enemyHP=MAX_HP,enemyMP=MAX_MP;  
 let enemyIQ=0,enemyDefending=false,playerDefending=false;  
 let aiInterval=null,aiActive=false,regenInterval=null,roundOver=false;  
-  
+
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));  
 const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;  
 const log=t=>{const p=document.createElement("p");p.innerText=t;battleLog.appendChild(p);battleLog.scrollTop=battleLog.scrollHeight;};  
@@ -216,45 +214,48 @@ function resetGame(){scores={player:0,enemy:0,score:0};enemyIQ=0;newRound();upda
 function startAI(){clearInterval(aiInterval);aiInterval=setInterval(enemyAction,getAISpeed());}  
 function startRegen(){clearInterval(regenInterval);regenInterval=setInterval(()=>{playerMP=clamp(playerMP+2,0,MAX_MP);enemyMP=clamp(enemyMP+2,0,MAX_MP);updateBars();},1000);}  
 function startGame(){gameArea.style.display="block";startBtn.style.display="none";newRound();showAlert("Welcome to the Arena ⚔!");log("Game started. You move first!");}  
-  
+
 /* === 🪙 WALLET SYSTEM WITH TON CONNECT === */  
 let wallet={tokens:0,address:""};  
 const API_URL="https://rpg-backend-gocj.onrender.com";  
-  
+
 function loadWallet(){const saved=localStorage.getItem("rpgWallet");if(saved)wallet=JSON.parse(saved);updateScoreboard();}  
 function saveWallet(){localStorage.setItem("rpgWallet",JSON.stringify(wallet));updateScoreboard();}  
-  
-/* ✅ TON CONNECT integration */  
-const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({  
-  manifestUrl: 'https://ton-connect.github.io/demo-dapp/tonconnect-manifest.json',  
-  buttonRootId: 'ton-connect'  
+
+const tonConnectUI=new TON_CONNECT_UI.TonConnectUI({  
+  manifestUrl:'https://ton-connect.github.io/demo-dapp/tonconnect-manifest.json',  
+  buttonRootId:'ton-connect'  
 });  
-  
-tonConnectUI.onStatusChange((walletInfo) => {  
-  if (walletInfo && walletInfo.account && walletInfo.account.address) {  
-    wallet.address = walletInfo.account.address;  
+
+tonConnectUI.onStatusChange((walletInfo)=>{  
+  if(walletInfo&&walletInfo.account&&walletInfo.account.address){  
+    wallet.address=walletInfo.account.address;  
     saveWallet();  
     showAlert("✅ Wallet connected!");  
     log(`Connected: ${wallet.address}`);  
-  } else {  
-    wallet.address = "";  
+  }else{  
+    wallet.address="";  
     saveWallet();  
     showAlert("🔌 Wallet disconnected");  
   }  
 });  
-  
-/* ✅ Sync function — matches backend /sync route */  
+
+/* ✅ Improved sync — address normalized + /reward endpoint */  
 async function syncWalletWithBackend(){  
   if(!wallet.address){showAlert("Please connect your wallet first!");return;}  
   if(wallet.tokens<=0){showAlert("No tokens to send!");return;}  
+
+  // Normalize TON address safely  
+  function normalizeTonAddress(addr){  
+    try{return new TON_CONNECT_SDK.Address(addr).toString(true,true,false);}catch{return addr.trim();}  
+  }  
+  const normalizedAddress=normalizeTonAddress(wallet.address);  
+
   try{  
-    const res=await fetch(`${API_URL}/sync`,{  
+    const res=await fetch(`${API_URL}/reward`,{  
       method:"POST",  
       headers:{"Content-Type":"application/json"},  
-      body:JSON.stringify({  
-        toAddress:wallet.address,  
-        tokens:wallet.tokens.toString()  
-      }),  
+      body:JSON.stringify({toAddress:normalizedAddress,amount:wallet.tokens.toString()}),  
     });  
     const data=await res.json();  
     if(data.success){  
@@ -262,13 +263,14 @@ async function syncWalletWithBackend(){
       log(`🪙 Tokens sent: ${wallet.tokens} to ${wallet.address}`);  
       wallet.tokens=0;saveWallet();  
     }else{  
-      showAlert("❌ Sync failed.");log(`❌ Reward error: ${JSON.stringify(data)}`);  
+      showAlert(`❌ Sync failed: ${data.error||"Unknown error"}`);  
+      log(`❌ Reward error: ${JSON.stringify(data)}`);  
     }  
   }catch(err){console.error("Sync error:",err);showAlert("⚠️ Wallet sync failed.");}  
 }  
-  
+
 window.addEventListener("DOMContentLoaded",loadWallet);  
 updateBars();updateScoreboard();  
 </script>  
 </body>  
-</html>
+</html
