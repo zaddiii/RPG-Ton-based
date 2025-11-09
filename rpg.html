@@ -2,9 +2,6 @@
 
 
 
-
-
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -214,17 +211,24 @@ const API_URL="https://rpg-backend-gocj.onrender.com";
 function loadWallet(){const saved=localStorage.getItem("rpgWallet");if(saved)wallet=JSON.parse(saved);updateScoreboard();}
 function saveWallet(){localStorage.setItem("rpgWallet",JSON.stringify(wallet));updateScoreboard();}
 
-/* ✅ New: connect wallet manually */
+/* ✅ Fixed: Allow EQ / 0Q / kQ TON addresses */
 function connectWallet(){
   const addr=document.getElementById("playerWalletAddress").value.trim();
-  if(!addr.startsWith("E")){showAlert("Invalid TON address!");return;}
+  if(
+    !addr.startsWith("EQ") &&
+    !addr.startsWith("0Q") &&
+    !addr.startsWith("kQ")
+  ){
+    showAlert("Invalid TON address! Use EQ, 0Q, or kQ.");
+    return;
+  }
   wallet.address=addr;
   saveWallet();
   showAlert("✅ Wallet connected!");
   log(`Connected wallet: ${wallet.address}`);
 }
 
-/* ✅ Fixed sync function — matches backend /sync route and tokens param */
+/* ✅ Sync function — matches backend /sync route */
 async function syncWalletWithBackend(){
   if(!wallet.address){showAlert("Please connect your wallet first!");return;}
   if(wallet.tokens<=0){showAlert("No tokens to send!");return;}
