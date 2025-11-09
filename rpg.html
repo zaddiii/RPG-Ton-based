@@ -7,6 +7,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">  
 <head>  
@@ -188,7 +189,7 @@
 <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>  
 
 <script>  
-/* === RPG logic (unchanged) === */  
+/* === RPG logic === */  
 const MAX_HP=200,MAX_MP=50,SPECIAL_COST=30,HEAL_COST=20,HEAL_HP=20;  
 let scores={player:0,enemy:0,score:0};  
 let playerHP=MAX_HP,playerMP=MAX_MP,enemyHP=MAX_HP,enemyMP=MAX_MP;  
@@ -227,7 +228,99 @@ tonConnectUI.onStatusChange((walletInfo)=>{
   }  
 });  
 
-/* ✅ Fetch merged correctly */  
+/* === Fixed: Start, Reset & Action functions === */
+function startGame(){  
+  document.getElementById("startBtn").style.display="none";  
+  document.getElementById("gameArea").style.display="block";  
+  resetGame();  
+  log("⚔ Battle started!");  
+}  
+
+function resetGame(){  
+  playerHP=MAX_HP;playerMP=MAX_MP;enemyHP=MAX_HP;enemyMP=MAX_MP;enemyIQ=0;  
+  roundOver=false;  
+  updateBars();  
+  document.getElementById("battleLog").innerHTML="";  
+  log("Game reset. Ready to fight!");  
+}  
+
+function playerAction(action){  
+  if(roundOver)return;  
+  switch(action){  
+    case "Attack":  
+      const dmg=randInt(15,25);  
+      const dealt=enemyDefending?dmg/2:dmg;  
+      enemyHP=clamp(enemyHP-dealt,0,MAX_HP);  
+      log(`🗡 Player attacked for ${dealt}!`);  
+      break;  
+    case "Defend":  
+      playerDefending=true;  
+      log("🛡 Player is defending!");  
+      break;  
+    case "Special":  
+      if(playerMP<SPECIAL_COST){log("❌ Not enough mana!");break;}  
+      const spdmg=randInt(30,40);  
+      playerMP-=SPECIAL_COST;  
+      enemyHP=clamp(enemyHP-spdmg,0,MAX_HP);  
+      log(`🔥 Special hit for ${spdmg}!`);  
+      break;  
+    case "Heal":  
+      if(playerMP<HEAL_COST){log("❌ Not enough mana!");break;}  
+      playerMP-=HEAL_COST;  
+      playerHP=clamp(playerHP+HEAL_HP,0,MAX_HP);  
+      log(`💖 Player healed +${HEAL_HP} HP`);  
+      break;  
+  }  
+  enemyTurn();  
+  updateBars();  
+  checkWinner();  
+}  
+
+function enemyTurn(){  
+  if(roundOver)return;  
+  const action=randInt(1,3);  
+  enemyDefending=false;  
+  if(action===1){  
+    const dmg=randInt(10,25);  
+    const dealt=playerDefending?dmg/2:dmg;  
+    playerHP=clamp(playerHP-dealt,0,MAX_HP);  
+    log(`👾 Enemy attacked for ${dealt}!`);  
+  }else if(action===2){  
+    enemyDefending=true;  
+    log("🛡 Enemy is defending!");  
+  }else{  
+    if(enemyMP>=SPECIAL_COST){  
+      const spdmg=randInt(25,35);  
+      enemyMP-=SPECIAL_COST;  
+      playerHP=clamp(playerHP-spdmg,0,MAX_HP);  
+      log(`⚡ Enemy used special for ${spdmg}!`);  
+    }  
+  }  
+  playerDefending=false;  
+  enemyIQ=clamp(enemyIQ+randInt(1,3),0,100);  
+  updateBars();  
+}  
+
+function checkWinner(){  
+  if(enemyHP<=0){  
+    roundOver=true;  
+    scores.player++;  
+    scores.score+=10;  
+    wallet.tokens+=5;  
+    saveWallet();  
+    showAlert("🏆 You won the round! +5 RPG");  
+    log("🎉 Player wins!");  
+  }else if(playerHP<=0){  
+    roundOver=true;  
+    scores.enemy++;  
+    scores.score=Math.max(0,scores.score-5);  
+    showAlert("💀 You lost the round!");  
+    log("😵 Enemy wins!");  
+  }  
+  updateScoreboard();  
+}  
+
+/* ✅ Sync wallet function (unchanged) */  
 async function syncWalletWithBackend(){  
   if(!wallet.address){showAlert("Please connect your wallet first!");return;}  
   if(wallet.tokens<=0){showAlert("No tokens to send!");return;}  
