@@ -7,9 +7,6 @@
 
 
 
-
-
-
 <!doctype html>
 <html lang="en">  
 <head>  
@@ -204,20 +201,10 @@ const log=t=>{const p=document.createElement("p");p.innerText=t;battleLog.append
 function showAlert(msg){const box=document.getElementById("alertBox");box.textContent=msg;box.classList.add("show");setTimeout(()=>box.classList.remove("show"),1500);}  
 function updateBars(){playerHealthBar.style.width=(playerHP/MAX_HP*100)+'%';playerManaBar.style.width=(playerMP/MAX_MP*100)+'%';enemyHealthBar.style.width=(enemyHP/MAX_HP*100)+'%';enemyManaBar.style.width=(enemyMP/MAX_MP*100)+'%';playerHealthText.innerText=`${playerHP}/${MAX_HP}`;playerManaText.innerText=`${playerMP}/${MAX_MP}`;enemyHealthText.innerText=`${enemyHP}/${MAX_HP}`;enemyManaText.innerText=`${enemyMP}/${MAX_MP}`;enemyIntelligenceBar.style.width=enemyIQ+'%';enemyIntelligenceText.innerText=`IQ ${enemyIQ.toFixed(1)}`;}  
 function updateScoreboard(){playerWins.innerText=scores.player;enemyWins.innerText=scores.enemy;score.innerText=scores.score;aiIQ.innerText=enemyIQ.toFixed(1);document.getElementById("walletBalance").innerText=wallet.tokens;}  
-function decideAction(){let a=['Attack','Defend','Heal','Special'];if(enemyMP<HEAL_COST)a=a.filter(x=>x!=='Heal');if(enemyMP<SPECIAL_COST)a=a.filter(x=>x!=='Special');if(enemyIQ<20)return a[randInt(0,a.length-1)];if(enemyHP<MAX_HP*0.6&&enemyMP>=HEAL_COST)return'Heal';if(playerHP>MAX_HP*0.3&&enemyMP>=SPECIAL_COST)return'Special';if(Math.random()<0.3)return'Defend';return'Attack';}  
-function getAISpeed(){if(enemyIQ<50)return 350;if(enemyIQ<80)return 300;return 250;}  
-function enemyAction(){if(!aiActive||playerHP<=0||enemyHP<=0||roundOver)return;enemyDefending=false;const act=decideAction();if(act==='Attack'){let dmg=randInt(18,35);let actual=playerDefending?Math.floor(dmg*0.25):dmg;if(playerDefending&&dmg>0)playerMP=clamp(playerMP+1,0,MAX_MP);playerHP=clamp(playerHP-actual,0,MAX_HP);showAlert(`Enemy attacks ${actual}!`);log(`Enemy attacks → ${actual} dmg.`);}else if(act==='Defend'){enemyDefending=true;showAlert("Enemy defends!");log("Enemy defends.");}else if(act==='Special'&&enemyMP>=SPECIAL_COST){enemyMP-=SPECIAL_COST;let dmg=randInt(15,40);let actual=playerDefending?Math.floor(dmg*0.25):dmg;if(playerDefending&&dmg>0)playerMP=clamp(playerMP+1,0,MAX_MP);playerHP=clamp(playerHP-actual,0,MAX_HP);showAlert(`Enemy Special → ${actual}!`);log(`Enemy Special → ${actual} dmg.`);}else if(act==='Heal'&&enemyMP>=HEAL_COST&&enemyHP<MAX_HP){const heal=Math.min(HEAL_HP,MAX_HP-enemyHP);enemyMP-=HEAL_COST;enemyHP=clamp(enemyHP+heal,0,MAX_HP);showAlert(`Enemy heals +${heal} HP.`);log(`Enemy heals +${heal} HP.`);}updateBars();checkEnd();}  
-function playerAction(act){if(roundOver)return;if(!aiActive){aiActive=true;startAI();log("AI engages after your first move!");}playerDefending=false;if(act==='Attack'){let dmg=randInt(12,28);let actual=enemyDefending?Math.floor(dmg*0.25):dmg;if(enemyDefending&&dmg>0)enemyMP=clamp(enemyMP+1,0,MAX_MP);enemyHP=clamp(enemyHP-actual,0,MAX_HP);showAlert(`You attacked for ${actual}!`);log(`Player attacks → ${actual} dmg.`);}else if(act==='Defend'){playerDefending=true;showAlert("You defend!");log("Player defends.");}else if(act==='Special'){if(playerMP<SPECIAL_COST){showAlert('Not enough mana.');return;}playerMP-=SPECIAL_COST;let dmg=randInt(15,40);let actual=enemyDefending?Math.floor(dmg*0.25):dmg;if(enemyDefending&&dmg>0)enemyMP=clamp(enemyMP+1,0,MAX_MP);enemyHP=clamp(enemyHP-actual,0,MAX_HP);showAlert(`You used Special → ${actual}!`);log(`Player Special → ${actual} dmg.`);}else if(act==='Heal'){if(playerHP>=MAX_HP){showAlert('HP full.');return;}if(playerMP<HEAL_COST){showAlert('Not enough mana.');return;}const heal=Math.min(HEAL_HP,MAX_HP-playerHP);playerMP-=HEAL_COST;playerHP=clamp(playerHP+heal,0,MAX_HP);showAlert(`Healed +${heal} HP (-${HEAL_COST} MP).`);log(`Player heals +${heal} HP.`);}updateBars();checkEnd();}  
-function checkEnd(){if(roundOver)return;if(playerHP<=0||enemyHP<=0){roundOver=true;clearInterval(aiInterval);clearInterval(regenInterval);aiActive=false;if(enemyHP<=0&&playerHP<=0)showAlert('Double KO!');else if(enemyHP<=0){showAlert('You Win!');scores.player++;scores.score+=50;enemyIQ+=1;const tokenReward=1;wallet.tokens+=tokenReward;saveWallet();log(`🏆 You earned ${tokenReward} token! Wallet: ${wallet.tokens}`);}else{showAlert('You Lose!');scores.enemy++;scores.score=Math.max(0,scores.score-30);enemyIQ+=0.5;}enemyIQ=clamp(enemyIQ,0,100);updateScoreboard();setTimeout(()=>{roundOver=false;newRound();},1200);}}  
-function newRound(){playerHP=enemyHP=MAX_HP;playerMP=enemyMP=MAX_MP;enemyDefending=playerDefending=false;aiActive=false;updateBars();updateScoreboard();log('New round — AI waits for your move.');startRegen();}  
-function resetGame(){scores={player:0,enemy:0,score:0};enemyIQ=0;newRound();updateScoreboard();log('Scoreboard reset — all wins cleared.');}  
-function startAI(){clearInterval(aiInterval);aiInterval=setInterval(enemyAction,getAISpeed());}  
-function startRegen(){clearInterval(regenInterval);regenInterval=setInterval(()=>{playerMP=clamp(playerMP+2,0,MAX_MP);enemyMP=clamp(enemyMP+2,0,MAX_MP);updateBars();},1000);}  
-function startGame(){gameArea.style.display="block";startBtn.style.display="none";newRound();showAlert("Welcome to the Arena ⚔!");log("Game started. You move first!");}  
 
-/* === 🪙 WALLET SYSTEM WITH TON CONNECT === */  
+/* === Wallet System === */  
 let wallet={tokens:0,address:""};  
-const API_URL="https://rpg-backend-gocj.onrender.com";  
+const API_URL="https://rpg-ton-backend.onrender.com";  
 
 function loadWallet(){const saved=localStorage.getItem("rpgWallet");if(saved)wallet=JSON.parse(saved);updateScoreboard();}  
 function saveWallet(){localStorage.setItem("rpgWallet",JSON.stringify(wallet));updateScoreboard();}  
@@ -240,22 +227,16 @@ tonConnectUI.onStatusChange((walletInfo)=>{
   }  
 });  
 
-/* ✅ Improved sync — address normalized + /reward endpoint */  
+/* ✅ Fetch merged correctly */  
 async function syncWalletWithBackend(){  
   if(!wallet.address){showAlert("Please connect your wallet first!");return;}  
   if(wallet.tokens<=0){showAlert("No tokens to send!");return;}  
 
-  // Normalize TON address safely  
-  function normalizeTonAddress(addr){  
-    try{return new TON_CONNECT_SDK.Address(addr).toString(true,true,false);}catch{return addr.trim();}  
-  }  
-  const normalizedAddress=normalizeTonAddress(wallet.address);  
-
   try{  
-    const res=await fetch(`${API_URL}/reward`,{  
+    const res=await fetch("https://rpg-ton-backend.onrender.com/reward",{  
       method:"POST",  
       headers:{"Content-Type":"application/json"},  
-      body:JSON.stringify({toAddress:normalizedAddress,amount:wallet.tokens.toString()}),  
+      body:JSON.stringify({toAddress:wallet.address,amount:wallet.tokens}),  
     });  
     const data=await res.json();  
     if(data.success){  
@@ -266,11 +247,14 @@ async function syncWalletWithBackend(){
       showAlert(`❌ Sync failed: ${data.error||"Unknown error"}`);  
       log(`❌ Reward error: ${JSON.stringify(data)}`);  
     }  
-  }catch(err){console.error("Sync error:",err);showAlert("⚠️ Wallet sync failed.");}  
+  }catch(err){  
+    console.error("Sync error:",err);  
+    showAlert("⚠️ Wallet sync failed.");  
+  }  
 }  
 
 window.addEventListener("DOMContentLoaded",loadWallet);  
 updateBars();updateScoreboard();  
 </script>  
 </body>  
-</html
+</html>
