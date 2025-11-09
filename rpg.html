@@ -5,15 +5,13 @@
 
 
 
-
-
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RPG Game</title>
+
   <style>
     body {
       background-color: #001f3f;
@@ -24,6 +22,7 @@
       margin: 0;
       padding: 0;
     }
+
     #scoreboard {
       position: fixed;
       top: 10px;
@@ -35,6 +34,7 @@
       color: #ffffff;
       line-height: 1.3;
     }
+
     #gameArea {
       display: none;
       margin-top: 20px;
@@ -47,7 +47,9 @@
       position: relative;
       z-index: 5;
     }
+
     .bar { transition: width 0.25s ease; }
+
     .bar-container {
       position: relative;
       background: #333;
@@ -55,6 +57,7 @@
       height: 14px;
       overflow: hidden;
     }
+
     .bar-text {
       position: absolute;
       top: 50%;
@@ -63,6 +66,7 @@
       font-size: 12px;
       pointer-events: none;
     }
+
     #battleLog {
       background-color: rgba(20, 20, 20, 0.8);
       color: #ddd;
@@ -74,6 +78,7 @@
       font-size: 13px;
       text-align: left;
     }
+
     button {
       border: none;
       border-radius: 10px;
@@ -85,7 +90,9 @@
       cursor: pointer;
       transition: transform 0.15s ease;
     }
+
     button:active { transform: scale(0.97); }
+
     #alertBox {
       position: fixed;
       top: 20px;
@@ -102,9 +109,26 @@
       pointer-events: none;
       font-size: 14px;
     }
+
     #alertBox.show { opacity: 1; }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 20px; margin-top: 15px; }
+      #scoreboard { font-size: 12px; top: 5px; left: 5px; }
+      #gameArea { padding: 10px; border-radius: 10px; }
+      button { font-size: 12px; padding: 6px 10px; margin: 3px; }
+      #battleLog { font-size: 12px; height: 120px; }
+      #alertBox { font-size: 12px; padding: 8px 16px; }
+    }
+
+    @media (max-width: 400px) {
+      #scoreboard { font-size: 11px; line-height: 1.2; }
+      button { width: 90%; max-width: 220px; display: block; margin: 6px auto; }
+      #ton-connect { transform: scale(0.75); }
+    }
   </style>
 </head>
+
 <body>
   <h1>⚔ RPG Battle Arena</h1>
 
@@ -126,6 +150,7 @@
       <div id="playerHealthBar" class="bar" style="background:red;width:100%;height:100%;"></div>
       <span id="playerHealthText" class="bar-text">200 / 200</span>
     </div>
+
     <div class="bar-container" style="margin-top:5px;">
       <div id="playerManaBar" class="bar" style="background:blue;width:100%;height:100%;"></div>
       <span id="playerManaText" class="bar-text">50 / 50</span>
@@ -136,10 +161,12 @@
       <div id="enemyHealthBar" class="bar" style="background:red;width:100%;height:100%;"></div>
       <span id="enemyHealthText" class="bar-text">200 / 200</span>
     </div>
+
     <div class="bar-container" style="margin-top:5px;">
       <div id="enemyManaBar" class="bar" style="background:blue;width:100%;height:100%;"></div>
       <span id="enemyManaText" class="bar-text">50 / 50</span>
     </div>
+
     <div class="bar-container" style="margin-top:5px;">
       <div id="enemyIntelligenceBar" class="bar" style="background:green;width:0;height:100%;"></div>
       <span id="enemyIntelligenceText" class="bar-text">IQ 0</span>
@@ -164,7 +191,60 @@
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
 
   <script>
-    /* === WALLET SYSTEM WITH TON CONNECT === */
+    /* === RPG GAME VARIABLES === */
+    const MAX_HP = 200, MAX_MP = 50, SPECIAL_COST = 30, HEAL_COST = 20, HEAL_HP = 20;
+    let scores = { player: 0, enemy: 0, score: 0 };
+    let playerHP = MAX_HP, playerMP = MAX_MP, enemyHP = MAX_HP, enemyMP = MAX_MP;
+    let enemyIQ = 0, enemyDefending = false, playerDefending = false;
+    let aiInterval = null, regenInterval = null, aiActive = false, roundOver = false;
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const randInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+
+    const log = t => {
+      const p = document.createElement("p");
+      p.innerText = t;
+      battleLog.appendChild(p);
+      battleLog.scrollTop = battleLog.scrollHeight;
+    };
+
+    function showAlert(msg) {
+      const box = document.getElementById("alertBox");
+      box.textContent = msg;
+      box.classList.add("show");
+      setTimeout(() => box.classList.remove("show"), 1500);
+    }
+
+    function updateBars() {
+      playerHealthBar.style.width = (playerHP / MAX_HP * 100) + '%';
+      playerManaBar.style.width = (playerMP / MAX_MP * 100) + '%';
+      enemyHealthBar.style.width = (enemyHP / MAX_HP * 100) + '%';
+      enemyManaBar.style.width = (enemyMP / MAX_MP * 100) + '%';
+      playerHealthText.innerText = `${playerHP}/${MAX_HP}`;
+      playerManaText.innerText = `${playerMP}/${MAX_MP}`;
+      enemyHealthText.innerText = `${enemyHP}/${MAX_HP}`;
+      enemyManaText.innerText = `${enemyMP}/${MAX_MP}`;
+      enemyIntelligenceBar.style.width = enemyIQ + '%';
+      enemyIntelligenceText.innerText = `IQ ${enemyIQ.toFixed(1)}`;
+    }
+
+    function updateScoreboard() {
+      playerWins.innerText = scores.player;
+      enemyWins.innerText = scores.enemy;
+      score.innerText = scores.score;
+      aiIQ.innerText = enemyIQ.toFixed(1);
+      document.getElementById("walletBalance").innerText = wallet.tokens;
+    }
+
+    function startGame() {
+      gameArea.style.display = "block";
+      startBtn.style.display = "none";
+      newRound();
+      showAlert("Welcome to the Arena ⚔!");
+      log("Game started. You move first!");
+    }
+
+    /* === WALLET SECTION === */
     let wallet = { tokens: 0, address: "" };
     const API_URL = "https://rpg-backend-gocj.onrender.com";
 
@@ -173,6 +253,7 @@
       if (saved) wallet = JSON.parse(saved);
       updateScoreboard();
     }
+
     function saveWallet() {
       localStorage.setItem("rpgWallet", JSON.stringify(wallet));
       updateScoreboard();
@@ -206,15 +287,13 @@
         return;
       }
 
-      const toAddress = wallet.address.trim();
-      const amount = wallet.tokens.toString();
-
       try {
-        const res = await fetch(`${API_URL}/sync`, {
+        const res = await fetch(`${API_URL}/reward`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ toAddress, amount }),
+          body: JSON.stringify({ toAddress: wallet.address.trim(), amount: wallet.tokens.toString() }),
         });
+
         const data = await res.json();
         if (data.success) {
           showAlert(`✅ Sent ${wallet.tokens} RPG tokens!`);
@@ -232,6 +311,8 @@
     }
 
     window.addEventListener("DOMContentLoaded", loadWallet);
+    updateBars();
+    updateScoreboard();
   </script>
 </body>
 </html>
