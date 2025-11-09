@@ -217,7 +217,7 @@ async function syncWalletWithBackend(){
   function normalizeTonAddress(addr){try{return new TON_CONNECT_SDK.Address(addr).toString(true,true,false);}catch{return addr.trim();}}
   const normalizedAddress=normalizeTonAddress(wallet.address);
   try{
-    const res=await fetch(`${API_URL}/reward`,{
+    const res=await fetch("https://rpg-backend-gocj.onrender.com/sync",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({toAddress:normalizedAddress,amount:wallet.tokens.toString()}),
