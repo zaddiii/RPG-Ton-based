@@ -176,7 +176,7 @@
 <div id="alertBox"></div>
 
 <script>
-/* ✅ Original JavaScript */
+/* ✅ Original JavaScript (unchanged game logic) */
 const MAX_HP = 200, MAX_MP = 50, SPECIAL_COST = 30, HEAL_COST = 20, HEAL_HP = 20;
 let scores = { player: 0, enemy: 0, score: 0 };
 let playerHP = MAX_HP, playerMP = MAX_MP, enemyHP = MAX_HP, enemyMP = MAX_MP;
@@ -375,6 +375,8 @@ function startGame(){
 
 /* === 🪙 WALLET SYSTEM === */
 let wallet = { tokens: 0 };
+
+// Keep your backend base URL here (no trailing /)
 const API_URL = "https://rpg-backend-gocj.onrender.com";
 
 function loadWallet() {
@@ -388,18 +390,45 @@ function saveWallet() {
   updateScoreboard();
 }
 
+/*
+  syncWalletWithBackend:
+  - posts to /sync
+  - expects JSON response (optionally with updated wallet object)
+  - updates `wallet` if backend returns `wallet` or `tokens`
+*/
 async function syncWalletWithBackend() {
   try {
-    const res = await fetch(API_URL, {
+    const res = await fetch(`${API_URL}/sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(wallet),
     });
-    const data = await res.json();
+
+    if (!res.ok) {
+      const text = await res.text().catch(()=>"");
+      log(`⚠️ Sync failed: ${res.status} ${res.statusText} ${text}`);
+      showAlert("Sync failed (server).");
+      return;
+    }
+
+    const data = await res.json().catch(()=>null);
     showAlert("Wallet synced with backend!");
     log(`Backend sync success: ${JSON.stringify(data)}`);
+
+    // If backend returns updated wallet or tokens, update local wallet
+    if (data) {
+      if (data.wallet) {
+        wallet = data.wallet;
+        saveWallet();
+      } else if (typeof data.tokens === "number") {
+        wallet.tokens = data.tokens;
+        saveWallet();
+      }
+    }
   } catch (err) {
+    console.error("Sync error:", err);
     log("⚠️ Could not sync wallet to backend.");
+    showAlert("Sync failed (network).");
   }
 }
 
