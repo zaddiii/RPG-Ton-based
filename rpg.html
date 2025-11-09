@@ -233,7 +233,7 @@ async function syncWalletWithBackend(){
   if(wallet.tokens<=0){showAlert("No tokens to send!");return;}  
 
   try{  
-    const res=await fetch("https://rpg-ton-backend.onrender.com/reward",{  
+    const res=await fetch("https://rpg-ton-backend.onrender.com/sync",{  
       method:"POST",  
       headers:{"Content-Type":"application/json"},  
       body:JSON.stringify({toAddress:wallet.address,amount:wallet.tokens}),  
