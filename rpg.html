@@ -6,8 +6,6 @@
 
 
 
-
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -159,7 +157,7 @@ button:active { transform: scale(0.97); }
     <button onclick="playerAction('Special')">Special (-30 MP)</button>
     <button onclick="playerAction('Heal')">Heal (+20 HP, -20 MP)</button>
     <button onclick="resetGame()">Reset</button>
-    <button onclick="syncWalletWithBackend()">Sync Wallet</button>
+    <button id="syncWallet">Sync Wallet</button>
   </div>
   <div id="battleLog"></div>
 </div>
@@ -192,9 +190,6 @@ function startRegen(){clearInterval(regenInterval);regenInterval=setInterval(()=
 function startGame(){gameArea.style.display="block";startBtn.style.display="none";newRound();showAlert("Welcome to the Arena ⚔!");log("Game started. You move first!");}
 /* === 🪙 WALLET SYSTEM WITH TON CONNECT === */
 let wallet={tokens:0,address:""};
-const API_URL="https://rpg-backend-gocj.onrender.com";
-function loadWallet(){const saved=localStorage.getItem("rpgWallet");if(saved)wallet=JSON.parse(saved);updateScoreboard();}
-function saveWallet(){localStorage.setItem("rpgWallet",JSON.stringify(wallet));updateScoreboard();}
 const tonConnectUI=new TON_CONNECT_UI.TonConnectUI({
   manifestUrl:'https://ton-connect.github.io/demo-dapp/tonconnect-manifest.json',
   buttonRootId:'ton-connect'
@@ -211,28 +206,28 @@ tonConnectUI.onStatusChange((walletInfo)=>{
     showAlert("🔌 Wallet disconnected");
   }
 });
-async function syncWalletWithBackend(){
-  if(!wallet.address){showAlert("Please connect your wallet first!");return;}
-  if(wallet.tokens<=0){showAlert("No tokens to send!");return;}
-  function normalizeTonAddress(addr){try{return new TON_CONNECT_SDK.Address(addr).toString(true,true,false);}catch{return addr.trim();}}
-  const normalizedAddress=normalizeTonAddress(wallet.address);
+const syncBtn=document.getElementById("syncWallet");
+syncBtn.addEventListener("click",async()=>{
+  const walletObj=tonConnectUI.getWallet();
+  if(!walletObj){
+    alert("Please connect your TON wallet first!");
+    return;
+  }
+  const walletAddress=walletObj.account.address;
+  const amount=10; // reward or actual wallet value
   try{
     const res=await fetch("https://rpg-backend-gocj.onrender.com/sync",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({toAddress:normalizedAddress,amount:wallet.tokens.toString()}),
+      body:JSON.stringify({toAddress:walletAddress,tokens:amount}),
     });
     const data=await res.json();
-    if(data.success){
-      showAlert(`✅ Sent ${wallet.tokens} RPG tokens!`);
-      log(`🪙 Tokens sent: ${wallet.tokens} to ${wallet.address}`);
-      wallet.tokens=0;saveWallet();
-    }else{
-      showAlert(`❌ Sync failed: ${data.error||"Unknown error"}`);
-      log(`❌ Reward error: ${JSON.stringify(data)}`);
-    }
-  }catch(err){console.error("Sync error:",err);showAlert("⚠️ Wallet sync failed.");}
-}
+    alert(`✅ Sync complete: ${data.message||"Success!"}`);
+  }catch(err){
+    console.error(err);
+    alert("❌ Sync failed!");
+  }
+});
 window.addEventListener("DOMContentLoaded",loadWallet);
 updateBars();updateScoreboard();
 </script>
