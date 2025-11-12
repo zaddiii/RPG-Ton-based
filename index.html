@@ -3,142 +3,74 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RPG TON Battle Arena</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RPG Battle Arena</title>
 
-  <!-- TON Connect UI -->
-  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
-  <script src="https://unpkg.com/@tonconnect/sdk@2.1.1/dist/tonconnect-sdk.min.js"></script>
-  <script src="https://unpkg.com/tonweb@0.0.67/dist/tonweb.min.js"></script>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      font-family: sans-serif;
-      background: #0d1117;
-      color: #fff;
-      padding: 20px;
-      text-align: center;
-    }
+<style>
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+  }
 
-    #connect {
-      margin-bottom: 30px;
-    }
+  /* Full page background with Pinterest primary & Unsplash fallback */
+  body::before {
+    content: "";
+    position: fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    background:
+      url('https://i.pinimg.com/originals/36/X4/oO/36X4oOdn9.jpg') no-repeat center center fixed,
+      url('https://images.unsplash.com/photo-1622714768650-8fef88e73a04?auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed;
+    background-size: cover;
+    filter: brightness(0.4);
+    z-index: -1;
+  }
 
-    button {
-      background: #007bff;
-      border: none;
-      padding: 10px 18px;
-      border-radius: 8px;
-      color: #fff;
-      cursor: pointer;
-      font-size: 16px;
-      margin: 10px;
-      transition: 0.2s;
-    }
-
-    button:disabled {
-      background: #555;
-      cursor: not-allowed;
-    }
-
-    .toast {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #1a1c28;
-      color: #fff;
-      padding: 15px 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-      opacity: 0;
-      transform: translateY(-20px);
-      transition: opacity 0.4s ease, transform 0.4s ease;
-      z-index: 9999;
-      font-weight: 500;
-    }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  </style>
+  /* Loading bar animation */
+  .progress-bar {
+    transition: width 0.3s ease-in-out;
+  }
+</style>
 </head>
+<body class="bg-neutral-900 flex flex-col items-center justify-center min-h-screen text-white">
 
-<body>
-  <h2>🎮 RPG TON Battle Arena</h2>
-  <div id="connect"></div>
+  <!-- Loading Container -->
+  <div class="flex flex-col items-center space-y-6">
+    <h1 class="text-4xl md:text-6xl font-extrabold text-cyan-400 drop-shadow-lg">RPG Battle Arena</h1>
+    <p class="text-lg md:text-xl text-gray-300">Loading arena...</p>
 
-  <div id="gameControls" style="display:none; flex-direction: column; align-items: center;">
-    <button id="playRPG">🎮 Play RPG</button>
+    <!-- Loading Bar -->
+    <div class="w-80 md:w-96 bg-gray-700 rounded-full overflow-hidden shadow-lg">
+      <div id="loadingProgress" class="progress-bar h-4 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 w-0"></div>
+    </div>
   </div>
 
-  <script type="module">
-    // 🔹 Backend API base URL (Render deployment)
-    const BACKEND_URL = "https://rpg-backend-gocj.onrender.com"; 
+<script>
+  // Simulate loading progress
+  let progress = 0;
+  const loadingProgress = document.getElementById('loadingProgress');
 
-    // 🔹 Initialize TON Connect UI
-    const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
-      manifestUrl: "https://zaddiii.github.io/RPG-Ton-based/tonconnect-manifest.json"
-    });
-    tonConnectUI.uiOptions = { language: "en", buttonRootId: "connect" };
+  const interval = setInterval(() => {
+    progress += Math.random() * 12; // random increment
+    if (progress > 100) progress = 100;
+    loadingProgress.style.width = progress + '%';
 
-    const gameControlsDiv = document.getElementById("gameControls");
-    const playBtn = document.getElementById("playRPG");
-
-    let connectedAddress = null;
-    let gameWindow = null;
-
-    // 🔔 Toast
-    function showToast(message) {
-      const toast = document.createElement("div");
-      toast.className = "toast";
-      toast.textContent = message;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.classList.add("show"), 100);
+    if(progress >= 100){
+      clearInterval(interval);
+      // Auto-open RPG game after short delay
       setTimeout(() => {
-        toast.classList.remove("show");
-        setTimeout(() => document.body.removeChild(toast), 400);
-      }, 3000);
-    }
-
-    // 🔗 Handle TON wallet connection
-    tonConnectUI.onStatusChange(async (walletInfo) => {
-      if (walletInfo && walletInfo.account) {
-        connectedAddress = walletInfo.account.address;
-        console.log("✅ Connected wallet address:", connectedAddress);
-        gameControlsDiv.style.display = "flex";
-      } else {
-        connectedAddress = null;
-        gameControlsDiv.style.display = "none";
-      }
-    });
-
-    // 🎮 Launch RPG
-    playBtn.addEventListener("click", () => {
-      if (!connectedAddress) return showToast("⚠️ Connect your wallet first!");
-      if (gameWindow && !gameWindow.closed) return showToast("⚠️ Game already open!");
-
-      playBtn.disabled = true;
-      const gameUrl = "https://zaddiii.github.io/RPG-Ton-based/rpg.html";
-      gameWindow = window.open(gameUrl, "_blank", "noopener,noreferrer");
-
-      const checkGameClosed = setInterval(() => {
-        if (gameWindow.closed) {
-          playBtn.disabled = false;
-          clearInterval(checkGameClosed);
-        }
+        window.location.href = "https://zaddiii.github.io/RPG-Ton-based/rpg.html";
       }, 500);
-    });
-  </script>
+    }
+  }, 250);
+</script>
+
 </body>
 </html>
