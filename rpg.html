@@ -6,6 +6,15 @@
 
 
 
+
+
+
+
+
+
+
+
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -101,6 +110,21 @@ button:active { transform: scale(0.97); }
   font-size: 14px;
 }
 #alertBox.show { opacity: 1; }
+/* Navigation Menu */
+#navMenu {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(0,0,50,0.8);
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+  gap: 15px;
+  z-index: 20;
+}
+#navMenu button { background: #fff; color:#001f3f; font-weight:bold; }
+
 @media (max-width: 600px) {
   h1 { font-size: 20px; margin-top: 15px; }
   #scoreboard { font-size: 12px; top: 5px; left: 5px; }
@@ -112,22 +136,19 @@ button:active { transform: scale(0.97); }
 @media (max-width: 400px) {
   #scoreboard { font-size: 11px; line-height: 1.2; }
   button { width: 90%; max-width: 220px; display: block; margin: 6px auto; }
-  #ton-connect { transform: scale(0.75); }
 }
 </style>
 </head>
 <body>
-<h1>⚔ RPG Battle Arena</h1>
+<h1>RPG Battle Arena</h1>
 <div id="scoreboard">
   <p><strong>Player Wins:</strong> <span id="playerWins">0</span></p>
   <p><strong>Enemy Wins:</strong> <span id="enemyWins">0</span></p>
   <p><strong>Score:</strong> <span id="score">0</span></p>
   <p><strong>AI IQ:</strong> <span id="aiIQ">0</span></p>
-  <p><strong>💰 Wallet:</strong> <span id="walletBalance">0</span></p>
+  <p><strong>💰 Tokens:</strong> <span id="walletBalance">0</span></p>
 </div>
-<div id="wallet-connect" style="margin-top:15px; text-align:center;">
-  <div id="ton-connect" style="display:inline-block; transform:scale(0.85); transform-origin:center; margin-bottom:8px;"></div>
-</div>
+
 <div id="gameArea">
   <p><strong>🧑‍🎮 Player</strong></p>
   <div class="bar-container">
@@ -141,7 +162,7 @@ button:active { transform: scale(0.97); }
   <p style="margin-top:10px;"><strong>👾 Enemy</strong></p>
   <div class="bar-container">
     <div id="enemyHealthBar" class="bar" style="background:red;width:100%;height:100%;"></div>
-    <span id="enemyHealthText" class="bar-text">200 / 200</span>
+    <span id="enemyHealthText" class="bar-text">300 / 300</span>
   </div>
   <div class="bar-container" style="margin-top:5px;">
     <div id="enemyManaBar" class="bar" style="background:blue;width:100%;height:100%;"></div>
@@ -157,79 +178,206 @@ button:active { transform: scale(0.97); }
     <button onclick="playerAction('Special')">Special (-30 MP)</button>
     <button onclick="playerAction('Heal')">Heal (+20 HP, -20 MP)</button>
     <button onclick="resetGame()">Reset</button>
-    <button id="syncWallet">Sync Wallet</button>
   </div>
   <div id="battleLog"></div>
 </div>
+
 <button id="startBtn" onclick="startGame()">Start Game</button>
 <div id="alertBox"></div>
-<script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
-<script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+
+<!-- Navigation Menu -->
+<div id="navMenu">
+  <button onclick="location.href='upgrade.html'">🛠 Upgrade</button>
+</div>
+
 <script>
+/* === Load Upgrades === */
+let attackUpgrade = parseInt(localStorage.getItem('attackUpgrade')) || 0;
+let specialUpgrade = parseInt(localStorage.getItem('specialUpgrade')) || 0;
+
+function loadUpgrades() {
+  attackUpgrade = parseInt(localStorage.getItem('attackUpgrade')) || 0;
+  specialUpgrade = parseInt(localStorage.getItem('specialUpgrade')) || 0;
+}
+
 /* === RPG logic === */
-const MAX_HP=200,MAX_MP=50,SPECIAL_COST=30,HEAL_COST=20,HEAL_HP=20;
-let scores={player:0,enemy:0,score:0};
-let playerHP=MAX_HP,playerMP=MAX_MP,enemyHP=MAX_HP,enemyMP=MAX_MP;
-let enemyIQ=0,enemyDefending=false,playerDefending=false;
-let aiInterval=null,aiActive=false,regenInterval=null,roundOver=false;
+const PLAYER_MAX_HP = 200;
+const MAX_MP = 50, SPECIAL_COST=30, HEAL_COST=20, HEAL_HP=20;
+
+let scores = {player:0, enemy:0, score:0};
+let playerHP = PLAYER_MAX_HP, playerMP = MAX_MP;
+let enemyMaxHP = 200, enemyMaxMP = 50;
+let enemyHP = enemyMaxHP, enemyMP = enemyMaxMP;
+let enemyIQ = 0, enemyDefending = false, playerDefending = false;
+
+let aiInterval=null, aiActive=false, regenInterval=null, roundOver=false;
+
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const log=t=>{const p=document.createElement("p");p.innerText=t;battleLog.appendChild(p);battleLog.scrollTop=battleLog.scrollHeight;};
 function showAlert(msg){const box=document.getElementById("alertBox");box.textContent=msg;box.classList.add("show");setTimeout(()=>box.classList.remove("show"),1500);}
-function updateBars(){playerHealthBar.style.width=(playerHP/MAX_HP*100)+'%';playerManaBar.style.width=(playerMP/MAX_MP*100)+'%';enemyHealthBar.style.width=(enemyHP/MAX_HP*100)+'%';enemyManaBar.style.width=(enemyMP/MAX_MP*100)+'%';playerHealthText.innerText=`${playerHP}/${MAX_HP}`;playerManaText.innerText=`${playerMP}/${MAX_MP}`;enemyHealthText.innerText=`${enemyHP}/${MAX_HP}`;enemyManaText.innerText=`${enemyMP}/${MAX_MP}`;enemyIntelligenceBar.style.width=enemyIQ+'%';enemyIntelligenceText.innerText=`IQ ${enemyIQ.toFixed(1)}`;}
-function updateScoreboard(){playerWins.innerText=scores.player;enemyWins.innerText=scores.enemy;score.innerText=scores.score;aiIQ.innerText=enemyIQ.toFixed(1);document.getElementById("walletBalance").innerText=wallet.tokens;}
-function decideAction(){let a=['Attack','Defend','Heal','Special'];if(enemyMP<HEAL_COST)a=a.filter(x=>x!=='Heal');if(enemyMP<SPECIAL_COST)a=a.filter(x=>x!=='Special');if(enemyIQ<20)return a[randInt(0,a.length-1)];if(enemyHP<MAX_HP*0.6&&enemyMP>=HEAL_COST)return'Heal';if(playerHP>MAX_HP*0.3&&enemyMP>=SPECIAL_COST)return'Special';if(Math.random()<0.3)return'Defend';return'Attack';}
-function getAISpeed(){if(enemyIQ<50)return 350;if(enemyIQ<80)return 300;return 250;}
-function enemyAction(){if(!aiActive||playerHP<=0||enemyHP<=0||roundOver)return;enemyDefending=false;const act=decideAction();if(act==='Attack'){let dmg=randInt(18,35);let actual=playerDefending?Math.floor(dmg*0.25):dmg;if(playerDefending&&dmg>0)playerMP=clamp(playerMP+1,0,MAX_MP);playerHP=clamp(playerHP-actual,0,MAX_HP);showAlert(`Enemy attacks ${actual}!`);log(`Enemy attacks → ${actual} dmg.`);}else if(act==='Defend'){enemyDefending=true;showAlert("Enemy defends!");log("Enemy defends.");}else if(act==='Special'&&enemyMP>=SPECIAL_COST){enemyMP-=SPECIAL_COST;let dmg=randInt(15,40);let actual=playerDefending?Math.floor(dmg*0.25):dmg;if(playerDefending&&dmg>0)playerMP=clamp(playerMP+1,0,MAX_MP);playerHP=clamp(playerHP-actual,0,MAX_HP);showAlert(`Enemy Special → ${actual}!`);log(`Enemy Special → ${actual} dmg.`);}else if(act==='Heal'&&enemyMP>=HEAL_COST&&enemyHP<MAX_HP){const heal=Math.min(HEAL_HP,MAX_HP-enemyHP);enemyMP-=HEAL_COST;enemyHP=clamp(enemyHP+heal,0,MAX_HP);showAlert(`Enemy heals +${heal} HP.`);log(`Enemy heals +${heal} HP.`);}updateBars();checkEnd();}
-function playerAction(act){if(roundOver)return;if(!aiActive){aiActive=true;startAI();log("AI engages after your first move!");}playerDefending=false;if(act==='Attack'){let dmg=randInt(12,28);let actual=enemyDefending?Math.floor(dmg*0.25):dmg;if(enemyDefending&&dmg>0)enemyMP=clamp(enemyMP+1,0,MAX_MP);enemyHP=clamp(enemyHP-actual,0,MAX_HP);showAlert(`You attacked for ${actual}!`);log(`Player attacks → ${actual} dmg.`);}else if(act==='Defend'){playerDefending=true;showAlert("You defend!");log("Player defends.");}else if(act==='Special'){if(playerMP<SPECIAL_COST){showAlert('Not enough mana.');return;}playerMP-=SPECIAL_COST;let dmg=randInt(15,40);let actual=enemyDefending?Math.floor(dmg*0.25):dmg;if(enemyDefending&&dmg>0)enemyMP=clamp(enemyMP+1,0,MAX_MP);enemyHP=clamp(enemyHP-actual,0,MAX_HP);showAlert(`You used Special → ${actual}!`);log(`Player Special → ${actual} dmg.`);}else if(act==='Heal'){if(playerHP>=MAX_HP){showAlert('HP full.');return;}if(playerMP<HEAL_COST){showAlert('Not enough mana.');return;}const heal=Math.min(HEAL_HP,MAX_HP-playerHP);playerMP-=HEAL_COST;playerHP=clamp(playerHP+heal,0,MAX_HP);showAlert(`Healed +${heal} HP (-${HEAL_COST} MP).`);log(`Player heals +${heal} HP.`);}updateBars();checkEnd();}
-function checkEnd(){if(roundOver)return;if(playerHP<=0||enemyHP<=0){roundOver=true;clearInterval(aiInterval);clearInterval(regenInterval);aiActive=false;if(enemyHP<=0&&playerHP<=0)showAlert('Double KO!');else if(enemyHP<=0){showAlert('You Win!');scores.player++;scores.score+=50;enemyIQ+=1;const tokenReward=1;wallet.tokens+=tokenReward;saveWallet();log(`🏆 You earned ${tokenReward} token! Wallet: ${wallet.tokens}`);}else{showAlert('You Lose!');scores.enemy++;scores.score=Math.max(0,scores.score-30);enemyIQ+=0.5;}enemyIQ=clamp(enemyIQ,0,100);updateScoreboard();setTimeout(()=>{roundOver=false;newRound();},1200);}}
-function newRound(){playerHP=enemyHP=MAX_HP;playerMP=enemyMP=MAX_MP;enemyDefending=playerDefending=false;aiActive=false;updateBars();updateScoreboard();log('New round — AI waits for your move.');startRegen();}
-function resetGame(){scores={player:0,enemy:0,score:0};enemyIQ=0;newRound();updateScoreboard();log('Scoreboard reset — all wins cleared.');}
-function startAI(){clearInterval(aiInterval);aiInterval=setInterval(enemyAction,getAISpeed());}
-function startRegen(){clearInterval(regenInterval);regenInterval=setInterval(()=>{playerMP=clamp(playerMP+2,0,MAX_MP);enemyMP=clamp(enemyMP+2,0,MAX_MP);updateBars();},1000);}
-function startGame(){gameArea.style.display="block";startBtn.style.display="none";newRound();showAlert("Welcome to the Arena ⚔!");log("Game started. You move first!");}
-/* === 🪙 WALLET SYSTEM WITH TON CONNECT === */
-let wallet={tokens:0,address:""};
-const tonConnectUI=new TON_CONNECT_UI.TonConnectUI({
-  manifestUrl:'https://ton-connect.github.io/demo-dapp/tonconnect-manifest.json',
-  buttonRootId:'ton-connect'
-});
-tonConnectUI.onStatusChange((walletInfo)=>{
-  if(walletInfo&&walletInfo.account&&walletInfo.account.address){
-    wallet.address=walletInfo.account.address;
-    saveWallet();
-    showAlert("✅ Wallet connected!");
-    log(`Connected: ${wallet.address}`);
-  }else{
-    wallet.address="";
-    saveWallet();
-    showAlert("🔌 Wallet disconnected");
+
+/* === Wallet system === */
+let wallet={tokens:0};
+function loadWallet(){
+  const saved=localStorage.getItem("rpgWallet");
+  if(saved) wallet=JSON.parse(saved);
+  else { wallet.tokens=1000; saveWallet(); showAlert('Welcome! 1000 tokens granted.'); }
+  updateScoreboard();
+}
+function saveWallet(){
+  localStorage.setItem("rpgWallet",JSON.stringify(wallet));
+  updateScoreboard();
+}
+
+/* === Bars & Scoreboard === */
+function updateBars(){
+  playerHealthBar.style.width=(playerHP/PLAYER_MAX_HP*100)+'%';
+  playerManaBar.style.width=(playerMP/MAX_MP*100)+'%';
+  enemyHealthBar.style.width=(enemyHP/enemyMaxHP*100)+'%';
+  enemyManaBar.style.width=(enemyMP/enemyMaxMP*100)+'%';
+  playerHealthText.innerText=`${playerHP}/${PLAYER_MAX_HP}`;
+  playerManaText.innerText=`${playerMP}/${MAX_MP}`;
+  enemyHealthText.innerText=`${enemyHP}/${enemyMaxHP}`;
+  enemyManaText.innerText=`${enemyMP}/${enemyMaxMP}`;
+  enemyIntelligenceBar.style.width=enemyIQ+'%';
+  enemyIntelligenceText.innerText=`IQ ${enemyIQ.toFixed(1)}`;
+}
+function updateScoreboard(){
+  playerWins.innerText=scores.player;
+  enemyWins.innerText=scores.enemy;
+  score.innerText=scores.score;
+  aiIQ.innerText=enemyIQ.toFixed(1);
+  document.getElementById("walletBalance").innerText=wallet.tokens;
+}
+
+/* === Enemy IQ & Stats Scaling === */
+function increaseEnemyIQ(){
+  enemyIQ = +(enemyIQ + 1.5).toFixed(1);
+  enemyMaxHP += 100;
+  enemyMaxMP += 20;
+  enemyHP = enemyMaxHP;
+  enemyMP = enemyMaxMP;
+  updateBars();
+}
+
+/* === Player and Enemy Actions === */
+function playerAction(act){
+  if(roundOver) return;
+  if(!aiActive){aiActive=true; startAI(); log("AI engages after your first move!");}
+  playerDefending=false;
+  if(act==='Attack'){ let dmg=Math.floor(randInt(12,28)*(1+attackUpgrade/100)); let actual=enemyDefending?Math.floor(dmg*0.25):dmg;
+    enemyHP=clamp(enemyHP-actual,0,enemyMaxHP);
+    showAlert(`You attacked for ${actual}!`); log(`Player attacks → ${actual} dmg.`);
+  } else if(act==='Defend'){ playerDefending=true; showAlert("You defend!"); log("Player defends."); }
+  else if(act==='Special'){ if(playerMP<SPECIAL_COST){showAlert('Not enough mana.'); return;}
+    playerMP-=SPECIAL_COST;
+    let baseMin=30, baseMax=50;
+    let dmg=Math.floor(randInt(baseMin,baseMax)*Math.pow(2,specialUpgrade)); 
+    let actual=enemyDefending?Math.floor(dmg*0.25):dmg;
+    enemyHP=clamp(enemyHP-actual,0,enemyMaxHP);
+    showAlert(`You used Special → ${actual}!`); log(`Player Special → ${actual} dmg.`);
+  } else if(act==='Heal'){ if(playerHP>=PLAYER_MAX_HP){showAlert('HP full.'); return;}
+    if(playerMP<HEAL_COST){showAlert('Not enough mana.'); return;} const heal=Math.min(HEAL_HP,PLAYER_MAX_HP-playerHP);
+    playerMP-=HEAL_COST; playerHP=clamp(playerHP+heal,0,PLAYER_MAX_HP);
+    showAlert(`Healed +${heal} HP (-${HEAL_COST} MP).`); log(`Player heals +${heal} HP.`);
   }
-});
-const syncBtn=document.getElementById("syncWallet");
-syncBtn.addEventListener("click",async()=>{
-  const walletObj=tonConnectUI.getWallet();
-  if(!walletObj){
-    alert("Please connect your TON wallet first!");
-    return;
+  updateBars(); checkEnd();
+}
+
+/* === Enemy & AI === */
+function decideAction(){
+  const actions=['Attack','Defend','Heal','Special'];
+  return actions[randInt(0,actions.length-1)];
+}
+function enemyAction(){
+  if(!aiActive||playerHP<=0||enemyHP<=0||roundOver) return;
+  enemyDefending=false;
+  const act=decideAction();
+  if(act==='Attack'){ let dmg=randInt(18,35); let actual=playerDefending?Math.floor(dmg*0.25):dmg;
+    playerHP=clamp(playerHP-actual,0,PLAYER_MAX_HP); showAlert(`Enemy attacks ${actual}!`); log(`Enemy attacks → ${actual} dmg.`);
+  } else if(act==='Defend'){ enemyDefending=true; showAlert("Enemy defends!"); log("Enemy defends."); }
+  else if(act==='Special' && enemyMP>=SPECIAL_COST){ enemyMP-=SPECIAL_COST; let dmg=randInt(30,50); let actual=playerDefending?Math.floor(dmg*0.25):dmg;
+    playerHP=clamp(playerHP-actual,0,PLAYER_MAX_HP); showAlert(`Enemy Special → ${actual}!`); log(`Enemy Special → ${actual} dmg.`); }
+  else if(act==='Heal' && enemyMP>=HEAL_COST && enemyHP<enemyMaxHP){ const heal=Math.min(HEAL_HP,enemyMaxHP-enemyHP);
+    enemyMP-=HEAL_COST; enemyHP=clamp(enemyHP+heal,0,enemyMaxHP); showAlert(`Enemy heals +${heal} HP.`); log(`Enemy heals +${heal} HP.`); }
+  updateBars(); checkEnd();
+}
+
+function startAI(){clearInterval(aiInterval); aiInterval=setInterval(enemyAction,400);}
+function startRegen(){clearInterval(regenInterval); regenInterval=setInterval(()=>{playerMP=clamp(playerMP+2,0,MAX_MP); enemyMP=clamp(enemyMP+2,0,enemyMaxMP); updateBars();},1000);}
+
+function checkEnd(){
+  if(roundOver) return;
+  if(playerHP<=0 || enemyHP<=0){
+    roundOver=true; 
+    clearInterval(aiInterval); 
+    clearInterval(regenInterval); 
+    aiActive=false;
+
+    if(enemyHP<=0 && playerHP<=0) {
+      showAlert('Double KO!');
+    }
+    else if(enemyHP<=0){
+      showAlert('You Win!');
+      scores.player++; 
+      scores.score+=50;
+      wallet.tokens+=100; 
+      saveWallet();
+
+      // Increase enemy stats cumulatively
+      increaseEnemyIQ(); 
+      log(`🏆 You earned 100 tokens! Wallet: ${wallet.tokens} | Enemy IQ ${enemyIQ.toFixed(1)}, HP → ${enemyMaxHP}, MP → ${enemyMaxMP}`);
+    } 
+    else { 
+      showAlert('You Lose!'); 
+      scores.enemy++; 
+      scores.score=Math.max(0,scores.score-30); 
+    }
+
+    updateScoreboard();
+    setTimeout(()=>{roundOver=false; newRound();},1200);
   }
-  const walletAddress=walletObj.account.address;
-  const amount=10; // reward or actual wallet value
-  try{
-    const res=await fetch("https://rpg-backend-gocj.onrender.com/sync",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({toAddress:walletAddress,tokens:amount}),
-    });
-    const data=await res.json();
-    alert(`✅ Sync complete: ${data.message||"Success!"}`);
-  }catch(err){
-    console.error(err);
-    alert("❌ Sync failed!");
-  }
+}
+
+function newRound(){
+  playerHP=PLAYER_MAX_HP; playerMP=MAX_MP; enemyHP=enemyMaxHP; enemyMP=enemyMaxMP;
+  enemyDefending=playerDefending=false; aiActive=false; updateBars(); updateScoreboard();
+  log('New round — AI waits for your move.'); startRegen();
+}
+
+function resetGame(){
+  scores = {player:0, enemy:0, score:0};
+  wallet.tokens = 1000;
+
+  // Reset enemy stats to base values
+  enemyIQ = 0;
+  enemyMaxHP = 200;  // base HP
+  enemyMaxMP = 50;   // base MP
+  enemyHP = enemyMaxHP;
+  enemyMP = enemyMaxMP;
+
+  saveWallet();
+  newRound();
+  updateScoreboard();
+  log('Game reset — Wallet restored to 1000 tokens and Enemy stats reset.');
+}
+
+function startGame(){
+  gameArea.style.display="block";
+  startBtn.style.display="none";
+  newRound();
+  showAlert("Welcome to the Arena ⚔!");
+  log("Game started. You move first!");
+  loadWallet();
+  loadUpgrades();
+}
+
+/* === Initialize on page load === */
+window.addEventListener("DOMContentLoaded", () => {
+  updateBars();
+  updateScoreboard();
 });
-window.addEventListener("DOMContentLoaded",loadWallet);
-updateBars();updateScoreboard();
 </script>
 </body>
 </html>
