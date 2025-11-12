@@ -5,228 +5,132 @@
 
 
 
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Coin Flip RPG</title>
+<title>Coin Flip Mini-Game</title>
 
-<!-- Tailwind CSS -->
+<!-- Tailwind CSS for styling -->
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 
 <style>
-  body {
-    font-family: 'Orbitron', sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    background: radial-gradient(circle at top left, #0f0c29, #302b63, #24243e);
-    color: white;
-    overflow: hidden;
-    padding: 20px;
-  }
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  background: linear-gradient(135deg, #001f3f, #0a2540);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  color: white;
+  padding: 30px;
+  text-align: center;
+}
 
-  h1 {
-    font-size: 3rem;
-    text-transform: uppercase;
-    color: #0ff;
-    text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 30px #0ff;
-    margin-bottom: 1rem;
-    animation: glow 2s infinite alternate;
-  }
+h1 { font-size: 2.5rem; margin-bottom: 15px; color: #0ff; text-shadow: 0 0 8px cyan; }
+.scoreboard { font-size: 1.2rem; margin-bottom: 20px; }
+.coin { width: 120px; height: 120px; border-radius: 50%; margin: 20px auto; line-height: 120px; font-weight: bold; border: 4px solid gold; display: flex; justify-content: center; align-items: center; font-size: 1.1rem; transition: transform 1s ease-in-out; }
+.result-box { margin: 20px auto; font-size: 1.25rem; font-weight: bold; padding: 15px; border: 2px solid #0ff; width: 280px; border-radius: 12px; text-align: center; color: #0ff; background: rgba(0,0,0,0.3); }
 
-  @keyframes glow {
-    from { text-shadow: 0 0 5px #0ff, 0 0 10px #0ff; }
-    to { text-shadow: 0 0 20px #0ff, 0 0 40px #0ff, 0 0 60px #0ff; }
-  }
-
-  .scoreboard {
-    display: flex;
-    justify-content: center;
-    gap: 2rem;
-    font-size: 1.25rem;
-    margin-bottom: 1.5rem;
-    padding: 0.5rem 1rem;
-    background: rgba(255,255,255,0.05);
-    border: 2px solid #0ff;
-    border-radius: 12px;
-    box-shadow: 0 0 15px #0ff66a;
-  }
-
-  .coin {
-    width: 150px;
-    height: 150px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1.5rem;
-    font-weight: bold;
-    border: 4px solid gold;
-    background: radial-gradient(circle at 30% 30%, #ffe066, #ffb700);
-    color: black;
-    margin-bottom: 1rem;
-    box-shadow: 0 0 20px gold, 0 0 40px orange;
-    transition: transform 1s ease-in-out;
-  }
-
-  .result-box {
-    font-size: 1.25rem;
-    font-weight: bold;
-    padding: 15px 25px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.05);
-    margin-bottom: 1.5rem;
-    box-shadow: 0 0 15px #0ff, 0 0 25px #0ff66a;
-    text-align: center;
-    min-width: 320px;
-  }
-
-  .input-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-
-  input[type="text"] {
-    padding: 10px;
-    font-size: 1rem;
-    width: 150px;
-    border-radius: 8px;
-    border: 2px solid #0ff;
-    text-align: center;
-    background: rgba(255,255,255,0.05);
-    color: white;
-    outline: none;
-  }
-
-  input[type="text"]::placeholder {
-    color: #aaa;
-  }
-
-  button {
-    padding: 10px 25px;
-    font-size: 1rem;
-    border-radius: 8px;
-    font-weight: bold;
-    border: 2px solid #0ff;
-    background: linear-gradient(45deg, #0ff, #00d4ff);
-    color: black;
-    cursor: pointer;
-    transition: 0.3s;
-    box-shadow: 0 0 10px #0ff, 0 0 20px #0ff66a;
-  }
-
-  button:hover {
-    background: linear-gradient(45deg, #00d4ff, #0ff);
-    transform: scale(1.05);
-    box-shadow: 0 0 20px #0ff, 0 0 40px #0ff66a;
-  }
+button {
+  padding: 16px 28px; /* bigger buttons */
+  font-size: 20px;     /* larger text */
+  border: 2px solid #0ff;
+  border-radius: 12px;
+  cursor: pointer;
+  background-color: #0a2540;
+  color: #0ff;
+  font-weight: bold;
+  margin: 5px;
+  transition: 0.15s;
+}
+button:active { transform: scale(0.97); }
+.flex-buttons { display: flex; justify-content: center; gap: 25px; margin-top: 15px; }
 </style>
 </head>
 <body>
 
-<h1>Coin Flip RPG</h1>
+<h1>🎲 Coin Flip Arena</h1>
 
 <div class="scoreboard">
-  <span>Wins: <span id="wins">0</span></span>
-  <span>Losses: <span id="losses">0</span></span>
-  <span>Tokens: <span id="tokens">0</span></span>
+  Wins: <span id="wins">0</span> | Losses: <span id="losses">0</span> | 💰 Tokens: <span id="walletBalance">0</span>
 </div>
 
 <div class="coin" id="coin">?</div>
 
-<div class="result-box" id="resultBox">Make your guess!</div>
+<div class="result-box" id="resultBox">Choose Heads or Tails!</div>
 
-<div class="input-container">
-  <input type="text" id="guessInput" placeholder="Heads or Tails">
-  <button id="flipBtn">Flip Coin</button>
+<div class="flex-buttons">
+  <button id="headsBtn">Heads</button>
+  <button id="tailsBtn">Tails</button>
 </div>
 
-<button id="backToGameBtn" class="mt-4 bg-gray-800 hover:bg-gray-700 text-white border-2 border-cyan-400">⬅ Back to RPG</button>
+<div class="mt-6">
+  <button onclick="window.close()">⬅ Back to RPG</button>
+</div>
 
 <script>
-  // Wallet / tokens
-  let wallet = JSON.parse(localStorage.getItem('rpgWallet')) || { tokens: 500 };
-  let wins = 0, losses = 0, flipCount = 0;
+let wins = 0;
+let losses = 0;
 
-  const winsSpan = document.getElementById('wins');
-  const lossesSpan = document.getElementById('losses');
-  const tokensSpan = document.getElementById('tokens');
-  const coinDiv = document.getElementById('coin');
-  const resultBox = document.getElementById('resultBox');
-  const flipBtn = document.getElementById('flipBtn');
-  const guessInput = document.getElementById('guessInput');
-  const backBtn = document.getElementById('backToGameBtn');
+// Load wallet from RPG localStorage
+let wallet = JSON.parse(localStorage.getItem('rpgWallet')) || { tokens: 1000 };
+document.getElementById('walletBalance').innerText = wallet.tokens;
 
-  function updateTokensDisplay() {
-    tokensSpan.textContent = wallet.tokens;
-  }
+const winsSpan = document.getElementById('wins');
+const lossesSpan = document.getElementById('losses');
+const coinDiv = document.getElementById('coin');
+const resultBox = document.getElementById('resultBox');
 
-  function saveWallet() {
-    localStorage.setItem('rpgWallet', JSON.stringify(wallet));
-  }
+function saveWallet() {
+  localStorage.setItem('rpgWallet', JSON.stringify(wallet));
+  document.getElementById('walletBalance').innerText = wallet.tokens;
+}
 
-  function flipCoin() {
-    const guess = guessInput.value.toLowerCase();
-    if(guess !== "heads" && guess !== "tails"){
-      resultBox.textContent = "Please enter 'Heads' or 'Tails'";
-      return;
+function flipCoin(playerGuess) {
+  coinDiv.textContent = "?";
+  const spins = Math.floor(Math.random() * 6 + 3);
+  const rotationDegrees = spins * 360;
+
+  coinDiv.style.transition = `transform 1s ease-in-out`;
+  coinDiv.style.transform = `rotateY(${rotationDegrees}deg)`;
+
+  setTimeout(() => {
+    const flipResult = Math.random() < 0.5 ? 'heads' : 'tails';
+    coinDiv.textContent = flipResult.charAt(0).toUpperCase() + flipResult.slice(1);
+
+    // Random token math
+    let reward = Math.floor(Math.random() * 100) + 20;   // 20–120 tokens
+    let penalty = Math.floor(Math.random() * 31) + 70;   // 70–100 tokens
+
+    if (playerGuess === flipResult) {
+      wins++;
+      wallet.tokens += reward;
+      resultBox.textContent = `You Win! +${reward} tokens 🎉`;
+    } else {
+      losses++;
+      wallet.tokens = Math.max(0, wallet.tokens - penalty);
+      resultBox.textContent = `You Lose! -${penalty} tokens ⚠️`;
     }
 
-    flipCount++;
-    coinDiv.textContent = "?";
-    const spins = Math.floor(Math.random() * 6 + 3);
-    const rotationDegrees = spins * 360;
-    const delay = 1000 + flipCount * 200;
-    coinDiv.style.transition = `transform ${delay}ms ease-in-out`;
-    coinDiv.style.transform = `rotateY(${rotationDegrees}deg)`;
+    winsSpan.textContent = wins;
+    lossesSpan.textContent = losses;
+    saveWallet();
+  }, 1000);
+}
 
-    resultBox.textContent = "Flipping... ⚡";
-
-    setTimeout(()=>{
-      const playerResult = Math.random() < 0.5 ? 'heads' : 'tails';
-      coinDiv.textContent = playerResult.charAt(0).toUpperCase() + playerResult.slice(1);
-      const computerResult = Math.random() < 0.5 ? 'heads' : 'tails';
-
-      let outcome;
-      const tokenChange = Math.floor(Math.random()*50)+20;
-
-      if(guess===playerResult){
-        wins++;
-        wallet.tokens += tokenChange;
-        outcome = `Player wins! Gained ${tokenChange} tokens. Computer: ${computerResult}`;
-      } else {
-        losses++;
-        wallet.tokens -= tokenChange;
-        if(wallet.tokens<0) wallet.tokens=0;
-        outcome = `Player loses! Lost ${tokenChange} tokens. Computer: ${computerResult}`;
-      }
-
-      resultBox.textContent = outcome;
-      winsSpan.textContent = wins;
-      lossesSpan.textContent = losses;
-      updateTokensDisplay();
-      saveWallet();
-
-      guessInput.value="";
-      guessInput.focus();
-    }, delay);
-  }
-
-  flipBtn.addEventListener('click', flipCoin);
-  updateTokensDisplay();
-
-  // Back to game button functionality
-  backBtn.addEventListener('click', () => {
-    window.location.href = "rpg.html"; // <-- Make sure this is the correct path to your RPG game file
-  });
+// Button events
+document.getElementById('headsBtn').addEventListener('click', () => flipCoin('heads'));
+document.getElementById('tailsBtn').addEventListener('click', () => flipCoin('tails'));
 </script>
 
 </body>
