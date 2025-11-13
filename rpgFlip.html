@@ -5,12 +5,6 @@
 
 
 
-
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -158,10 +152,10 @@
 <button id="backToGameBtn" class="mt-4 bg-gray-800 hover:bg-gray-700 text-white border-2 border-cyan-400">⬅ Back to RPG</button>
 
 <script>
-  // Wallet / tokens
-  let wallet = JSON.parse(localStorage.getItem('rpgWallet')) || { tokens: 500 };
-  let wins = 0, losses = 0, flipCount = 0;
+  const PLAYER_ID = "player123"; // same ID as your RPG game
+  const BASE_URL = "https://rpg-storage-server.onrender.com/players";
 
+  let wins = 0, losses = 0, flipCount = 0;
   const winsSpan = document.getElementById('wins');
   const lossesSpan = document.getElementById('losses');
   const tokensSpan = document.getElementById('tokens');
@@ -171,12 +165,36 @@
   const guessInput = document.getElementById('guessInput');
   const backBtn = document.getElementById('backToGameBtn');
 
-  function updateTokensDisplay() {
-    tokensSpan.textContent = wallet.tokens;
+  let wallet = { tokens: 1000 };
+
+  /* === Load wallet from backend === */
+  async function loadWallet() {
+    try {
+      const res = await fetch(`${BASE_URL}/${PLAYER_ID}`);
+      const data = await res.json();
+      wallet.tokens = data.tokens ?? 1000;
+      updateTokensDisplay();
+    } catch(err) {
+      console.error("Error loading wallet:", err);
+    }
   }
 
-  function saveWallet() {
-    localStorage.setItem('rpgWallet', JSON.stringify(wallet));
+  /* === Save wallet to backend === */
+  async function saveWallet() {
+    try {
+      const payload = { tokens: wallet.tokens };
+      await fetch(`${BASE_URL}/${PLAYER_ID}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } catch(err) {
+      console.error("Error saving wallet:", err);
+    }
+  }
+
+  function updateTokensDisplay() {
+    tokensSpan.textContent = wallet.tokens;
   }
 
   function flipCoin() {
@@ -196,7 +214,7 @@
 
     resultBox.textContent = "Flipping... ⚡";
 
-    setTimeout(()=>{
+    setTimeout(async ()=>{
       const playerResult = Math.random() < 0.5 ? 'heads' : 'tails';
       coinDiv.textContent = playerResult.charAt(0).toUpperCase() + playerResult.slice(1);
       const computerResult = Math.random() < 0.5 ? 'heads' : 'tails';
@@ -211,7 +229,7 @@
       } else {
         losses++;
         wallet.tokens -= tokenChange;
-        if(wallet.tokens<0) wallet.tokens=0;
+        if(wallet.tokens < 0) wallet.tokens = 0; // prevent negative
         outcome = `Player loses! Lost ${tokenChange} tokens. Computer: ${computerResult}`;
       }
 
@@ -219,20 +237,22 @@
       winsSpan.textContent = wins;
       lossesSpan.textContent = losses;
       updateTokensDisplay();
-      saveWallet();
 
-      guessInput.value="";
+      // Save wallet to backend
+      await saveWallet();
+
+      guessInput.value = "";
       guessInput.focus();
     }, delay);
   }
 
   flipBtn.addEventListener('click', flipCoin);
-  updateTokensDisplay();
-
-  // Back to game button functionality
   backBtn.addEventListener('click', () => {
-    window.location.href = "rpg.html"; // <-- Make sure this is the correct path to your RPG game file
+    window.location.href = "rpg6.html"; // path to your RPG
   });
+
+  // Load wallet on page load
+  window.addEventListener("DOMContentLoaded", loadWallet);
 </script>
 
 </body>
