@@ -3,27 +3,12 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RPG Battle Arena</title>
+<title>RPG Battle Arena — Dark Vibes</title>
 
 <!-- Google Font -->
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -247,39 +232,11 @@ button:active {
 </div>
 
 <script>
-/* === Load Upgrades (keeps existing behavior) === */
-let attackUpgrade = parseInt(localStorage.getItem('attackUpgrade')) || 0;
-let specialUpgrade = parseInt(localStorage.getItem('specialUpgrade')) || 0;
-function loadUpgrades() {
-  attackUpgrade = parseInt(localStorage.getItem('attackUpgrade')) || 0;
-  specialUpgrade = parseInt(localStorage.getItem('specialUpgrade')) || 0;
-}
+/* === Unified Backend Setup === */
+const PLAYER_ID = "player123";
+const BASE_URL = "https://rpg-storage-server.onrender.com/players";
 
-// Live Upgrade Updates
-function applyUpgrades() {
-  // Read current upgrades from localStorage
-  attackUpgrade = parseInt(localStorage.getItem('attackUpgrade')) || 0;
-  specialUpgrade = parseInt(localStorage.getItem('specialUpgrade')) || 0;
-
-  // Optional: show upgrade info on screen (if you have UI for it)
-  const attackInfo = document.getElementById('attackUpgradeInfo');
-  const specialInfo = document.getElementById('specialUpgradeInfo');
-  if(attackInfo) attackInfo.innerText = `Attack Upgrade: +${attackUpgrade}%`;
-  if(specialInfo) specialInfo.innerText = `Special Upgrade: x${Math.pow(2, specialUpgrade)}`;
-}
-
-// Watch for changes in localStorage from upgrade page
-window.addEventListener('storage', (event) => {
-  if(event.key === 'attackUpgrade' || event.key === 'specialUpgrade') {
-    applyUpgrades();
-    showAlert('Upgrades Updated!');
-  }
-});
-
-// Initial load on game start
-applyUpgrades();
-
-/* === Constants & base stats === */
+/* === Base Stats === */
 const PLAYER_MAX_HP = 200;
 const PLAYER_BASE_MP = 50;
 const MAX_MP = PLAYER_BASE_MP;
@@ -287,262 +244,230 @@ const SPECIAL_COST = 30;
 const HEAL_COST = 20;
 const HEAL_HP = 20;
 
-/* === State === */
-let scores = { player: 0, enemy: 0, score: 0 };
-let playerHP = PLAYER_MAX_HP, playerMP = PLAYER_BASE_MP;
-let enemyMaxHP = 200, enemyMaxMP = 50; // base as you specified
-let enemyHP = enemyMaxHP, enemyMP = enemyMaxMP;
-let enemyIQ = 0;
-let enemyDefending = false, playerDefending = false;
+/* === Game State === */
+let attackUpgrade = 0;
+let specialUpgrade = 0;
 
-let aiInterval = null, aiActive = false, regenInterval = null, roundOver = false;
+let gameState = {
+  scores: { player: 0, enemy: 0, score: 0 },
+  player: { hp: PLAYER_MAX_HP, mp: PLAYER_BASE_MP },
+  enemy: { hp: 200, mp: 50, maxHP: 200, maxMP: 50, iq: 0 },
+  wallet: { tokens: 1000 },
+  upgrades: { attack: attackUpgrade, special: specialUpgrade },
+  roundOver: false
+};
 
-/* === Wallet (localStorage) === */
-let wallet = { tokens: 0 };
-function loadWallet(){
-  const saved = localStorage.getItem("rpgWallet");
-  if(saved) wallet = JSON.parse(saved);
-  else { wallet.tokens = 1000; saveWallet(); showAlert('Welcome! 1000 tokens granted.'); }
-  updateScoreboard();
+/* === Load/Save from backend === */
+async function loadPlayerData(){
+  try{
+    const res = await fetch(`${BASE_URL}/${PLAYER_ID}`);
+    const data = await res.json();
+
+    gameState.wallet.tokens = data.tokens ?? 1000;
+    gameState.player.hp = data.hp ?? PLAYER_MAX_HP;
+    gameState.player.mp = data.mp ?? PLAYER_BASE_MP;
+    gameState.enemy.hp = data.enemyHp ?? 200;
+    gameState.enemy.mp = data.enemyMp ?? 50;
+    gameState.enemy.maxHP = data.enemyMaxHP ?? 200;
+    gameState.enemy.maxMP = data.enemyMaxMP ?? 50;
+    gameState.enemy.iq = data.enemyIQ ?? 0;
+
+    attackUpgrade = data.attackUpgrade ?? 0;
+    specialUpgrade = data.specialUpgrade ?? 0;
+    applyUpgrades();
+    updateScoreboard();
+    updateBars();
+  } catch(err){ console.error("Error loading player data:", err); }
 }
-function saveWallet(){
-  localStorage.setItem("rpgWallet", JSON.stringify(wallet));
-  updateScoreboard();
+
+async function savePlayerData(){
+  try{
+    const payload = {
+      tokens: gameState.wallet.tokens,
+      hp: gameState.player.hp,
+      mp: gameState.player.mp,
+      attackUpgrade,
+      specialUpgrade,
+      enemyHp: gameState.enemy.hp,
+      enemyMp: gameState.enemy.mp,
+      enemyMaxHP: gameState.enemy.maxHP,
+      enemyMaxMP: gameState.enemy.maxMP,
+      enemyIQ: gameState.enemy.iq
+    };
+    await fetch(`${BASE_URL}/${PLAYER_ID}`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+  } catch(err){ console.error("Error saving player data:", err); }
 }
 
-/* === Small utilities === */
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const randInt = (a,b) => Math.floor(Math.random()*(b-a+1)) + a;
-const log = t => { const p = document.createElement("p"); p.innerText = t; battleLog.appendChild(p); battleLog.scrollTop = battleLog.scrollHeight; };
-function showAlert(msg){ const box = document.getElementById("alertBox"); box.textContent = msg; box.classList.add("show"); setTimeout(()=>box.classList.remove("show"),1500); }
+/* === Utilities === */
+const clamp = (v, lo, hi)=>Math.max(lo,Math.min(hi,v));
+const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const log=t=>{const p=document.createElement("p");p.innerText=t;battleLog.appendChild(p);battleLog.scrollTop=battleLog.scrollHeight;};
+function showAlert(msg){const box=document.getElementById("alertBox");box.textContent=msg;box.classList.add("show");setTimeout(()=>box.classList.remove("show"),1500);}
+function applyUpgrades(){gameState.upgrades.attack=attackUpgrade;gameState.upgrades.special=specialUpgrade;}
 
-/* === Bars & scoreboard updates (keeps your DOM IDs) === */
+/* === Bars & Scoreboard Updates === */
 function updateBars(){
-  // Avoid division by zero
-  const pMax = PLAYER_MAX_HP || 200;
-  playerHealthBar.style.width = (playerHP / pMax * 100) + '%';
-  playerManaBar.style.width = (playerMP / MAX_MP * 100) + '%';
-  enemyHealthBar.style.width = (enemyHP / enemyMaxHP * 100) + '%';
-  enemyManaBar.style.width = (enemyMP / enemyMaxMP * 100) + '%';
-  playerHealthText.innerText = `${playerHP}/${PLAYER_MAX_HP}`;
-  playerManaText.innerText = `${playerMP}/${MAX_MP}`;
-  enemyHealthText.innerText = `${enemyHP}/${enemyMaxHP}`;
-  enemyManaText.innerText = `${enemyMP}/${enemyMaxMP}`;
-  enemyIntelligenceBar.style.width = (enemyIQ > 100 ? 100 : enemyIQ) + '%';
-  enemyIntelligenceText.innerText = `IQ ${enemyIQ.toFixed(1)}`;
+  playerHealthBar.style.width = (gameState.player.hp/PLAYER_MAX_HP*100)+'%';
+  playerManaBar.style.width = (gameState.player.mp/MAX_MP*100)+'%';
+  enemyHealthBar.style.width = (gameState.enemy.hp/gameState.enemy.maxHP*100)+'%';
+  enemyManaBar.style.width = (gameState.enemy.mp/gameState.enemy.maxMP*100)+'%';
+  enemyIntelligenceBar.style.width = Math.min(gameState.enemy.iq,100)+'%';
+  playerHealthText.innerText = `${gameState.player.hp}/${PLAYER_MAX_HP}`;
+  playerManaText.innerText = `${gameState.player.mp}/${MAX_MP}`;
+  enemyHealthText.innerText = `${gameState.enemy.hp}/${gameState.enemy.maxHP}`;
+  enemyManaText.innerText = `${gameState.enemy.mp}/${gameState.enemy.maxMP}`;
+  enemyIntelligenceText.innerText = `IQ ${gameState.enemy.iq.toFixed(1)}`;
 }
+
 function updateScoreboard(){
-  playerWins.innerText = scores.player;
-  enemyWins.innerText = scores.enemy;
-  score.innerText = scores.score;
-  aiIQ.innerText = enemyIQ.toFixed(1);
-  document.getElementById("walletBalance").innerText = wallet.tokens;
+  playerWins.innerText = gameState.scores.player;
+  enemyWins.innerText = gameState.scores.enemy;
+  score.innerText = gameState.scores.score;
+  aiIQ.innerText = gameState.enemy.iq.toFixed(1);
+  walletBalance.innerText = gameState.wallet.tokens;
 }
 
-/* === Enemy scaling function (persistent scaling) ===
-   On every player win:
-     - enemyIQ += 1.5
-     - enemyMaxHP += 100
-     - enemyMaxMP += 20
-   Current HP/MP are set to full when scaled.
-*/
-function increaseEnemyStatsPerWin() {
-  enemyIQ = +(enemyIQ + 1.5).toFixed(1);
-  enemyMaxHP = enemyMaxHP + 100;
-  enemyMaxMP = enemyMaxMP + 20;
-  // top up to new max so next round starts full
-  enemyHP = enemyMaxHP;
-  enemyMP = enemyMaxMP;
-  updateBars();
+/* === Enemy Scaling === */
+function increaseEnemyStatsPerWin(){
+  gameState.enemy.iq = +(gameState.enemy.iq+1.5).toFixed(1);
+  gameState.enemy.maxHP += 100;
+  gameState.enemy.maxMP += 20;
+  gameState.enemy.hp = gameState.enemy.maxHP;
+  gameState.enemy.mp = gameState.enemy.maxMP;
 }
 
-/* === Player actions === */
+/* === Player Actions === */
+let aiInterval=null, aiActive=false, regenInterval=null;
+
 function playerAction(act){
-  if(roundOver) return;
-  if(!aiActive){ aiActive = true; startAI(); log("AI engages after your first move!"); }
-  playerDefending = false;
-
-  if(act === 'Attack'){
-    // attackUpgrade is percent stored (e.g., 30 means +30%)
-    const base = randInt(12, 28);
-    const dmg = Math.floor(base * (1 + (attackUpgrade||0)/100));
-    const actual = enemyDefending ? Math.floor(dmg * 0.25) : dmg;
-    enemyHP = clamp(enemyHP - actual, 0, enemyMaxHP);
-    showAlert(`You attacked for ${actual}!`);
-    log(`Player attacks → ${actual} dmg.`);
-  }
-  else if(act === 'Defend'){
-    playerDefending = true;
-    showAlert("You defend!");
-    log("Player defends (reduced dmg next enemy hit).");
-  }
-  else if(act === 'Special'){
-    if(playerMP < SPECIAL_COST){ showAlert('Not enough mana.'); return; }
-    playerMP -= SPECIAL_COST;
-    const base = randInt(30, 50);
-    const dmg = Math.floor(base * Math.pow(2, specialUpgrade || 0));
-    const actual = enemyDefending ? Math.floor(dmg * 0.25) : dmg;
-    enemyHP = clamp(enemyHP - actual, 0, enemyMaxHP);
-    showAlert(`You used Special → ${actual}!`);
-    log(`Player Special → ${actual} dmg.`);
-  }
-  else if(act === 'Heal'){
-    if(playerHP >= PLAYER_MAX_HP){ showAlert('HP full.'); return; }
-    if(playerMP < HEAL_COST){ showAlert('Not enough mana.'); return; }
-    const heal = Math.min(HEAL_HP, PLAYER_MAX_HP - playerHP);
-    playerMP -= HEAL_COST;
-    playerHP = clamp(playerHP + heal, 0, PLAYER_MAX_HP);
+  if(gameState.roundOver) return;
+  if(!aiActive){ aiActive=true; startAI(); log("AI engages after your first move!"); }
+  if(act==='Attack'){
+    const dmg=Math.floor(randInt(12,28)*(1+attackUpgrade/100));
+    gameState.enemy.hp=clamp(gameState.enemy.hp-dmg,0,gameState.enemy.maxHP);
+    showAlert(`You attacked for ${dmg}!`);
+    log(`Player attacks → ${dmg} dmg.`);
+  } else if(act==='Defend'){ showAlert("You defend!"); log("Player defends."); }
+  else if(act==='Special'){
+    if(gameState.player.mp<SPECIAL_COST){ showAlert('Not enough mana.'); return; }
+    gameState.player.mp -= SPECIAL_COST;
+    const dmg=Math.floor(randInt(30,50)*Math.pow(2,specialUpgrade||0));
+    gameState.enemy.hp=clamp(gameState.enemy.hp-dmg,0,gameState.enemy.maxHP);
+    showAlert(`You used Special → ${dmg}!`);
+    log(`Player Special → ${dmg} dmg.`);
+  } else if(act==='Heal'){
+    if(gameState.player.hp>=PLAYER_MAX_HP){ showAlert('HP full.'); return; }
+    if(gameState.player.mp<HEAL_COST){ showAlert('Not enough mana.'); return; }
+    const heal=Math.min(HEAL_HP,PLAYER_MAX_HP-gameState.player.hp);
+    gameState.player.mp -= HEAL_COST;
+    gameState.player.hp = clamp(gameState.player.hp+heal,0,PLAYER_MAX_HP);
     showAlert(`Healed +${heal} HP (-${HEAL_COST} MP).`);
     log(`Player heals +${heal} HP.`);
   }
-
-  updateBars();
-  checkEnd();
+  updateBars(); checkEnd(); savePlayerData();
 }
 
 /* === Enemy AI === */
-function decideAction(){
-  // Weighted random: Attack (50%), Defend (15%), Heal (20%), Special (15%)
-  const r = Math.random();
-  if(r < 0.5) return 'Attack';
-  if(r < 0.65) return 'Defend';
-  if(r < 0.85) return 'Heal';
-  return 'Special';
-}
+function decideAction(){const r=Math.random();if(r<0.5)return 'Attack';if(r<0.65)return 'Defend';if(r<0.85)return 'Heal';return 'Special';}
 function enemyAction(){
-  if(!aiActive || playerHP <= 0 || enemyHP <= 0 || roundOver) return;
-  enemyDefending = false;
-  const act = decideAction();
-
-  if(act === 'Attack'){
-    let dmg = randInt(18, 35);
-    let actual = playerDefending ? Math.floor(dmg * 0.25) : dmg;
-    playerHP = clamp(playerHP - actual, 0, PLAYER_MAX_HP);
-    showAlert(`Enemy attacks ${actual}!`);
-    log(`Enemy attacks → ${actual} dmg.`);
-  }
-  else if(act === 'Defend'){
-    enemyDefending = true;
-    showAlert("Enemy defends!");
-    log("Enemy defends (reduced dmg next player hit).");
-  }
-  else if(act === 'Special' && enemyMP >= SPECIAL_COST){
-    enemyMP -= SPECIAL_COST;
-    let dmg = randInt(30, 50);
-    let actual = playerDefending ? Math.floor(dmg * 0.25) : dmg;
-    playerHP = clamp(playerHP - actual, 0, PLAYER_MAX_HP);
-    showAlert(`Enemy Special → ${actual}!`);
-    log(`Enemy Special → ${actual} dmg.`);
-  }
-  else if(act === 'Heal' && enemyMP >= HEAL_COST && enemyHP < enemyMaxHP){
-    const heal = Math.min(HEAL_HP, enemyMaxHP - enemyHP);
-    enemyMP -= HEAL_COST;
-    enemyHP = clamp(enemyHP + heal, 0, enemyMaxHP);
-    showAlert(`Enemy heals +${heal} HP.`);
-    log(`Enemy heals +${heal} HP.`);
-  }
-
-  updateBars();
-  checkEnd();
+  if(!aiActive||gameState.player.hp<=0||gameState.enemy.hp<=0||gameState.roundOver)return;
+  const act=decideAction();
+  if(act==='Attack'){let dmg=randInt(18,35);gameState.player.hp=clamp(gameState.player.hp-dmg,0,PLAYER_MAX_HP);showAlert(`Enemy attacks ${dmg}!`);log(`Enemy attacks → ${dmg} dmg.`);}
+  else if(act==='Special'&&gameState.enemy.mp>=SPECIAL_COST){gameState.enemy.mp-=SPECIAL_COST;let dmg=randInt(30,50);gameState.player.hp=clamp(gameState.player.hp-dmg,0,PLAYER_MAX_HP);showAlert(`Enemy Special → ${dmg}!`);log(`Enemy Special → ${dmg} dmg.`);}
+  else if(act==='Heal'&&gameState.enemy.mp>=HEAL_COST&&gameState.enemy.hp<gameState.enemy.maxHP){const heal=Math.min(HEAL_HP,gameState.enemy.maxHP-gameState.enemy.hp);gameState.enemy.mp-=HEAL_COST;gameState.enemy.hp=clamp(gameState.enemy.hp+heal,0,gameState.enemy.maxHP);showAlert(`Enemy heals +${heal} HP.`);log(`Enemy heals +${heal} HP.`);}
+  updateBars(); checkEnd(); savePlayerData();
 }
 
 /* === Intervals === */
-function startAI(){ clearInterval(aiInterval); aiInterval = setInterval(enemyAction, 600); }
-function startRegen(){ clearInterval(regenInterval); regenInterval = setInterval(()=>{
-  playerMP = clamp(playerMP + 2, 0, MAX_MP);
-  enemyMP = clamp(enemyMP + 2, 0, enemyMaxMP);
-  updateBars();
-}, 1000); }
+function startAI(){clearInterval(aiInterval);aiInterval=setInterval(enemyAction,600);}
+function startRegen(){
+  clearInterval(regenInterval);
+  regenInterval = setInterval(()=>{
+    gameState.player.mp = clamp(gameState.player.mp + 2, 0, MAX_MP);
+    gameState.enemy.mp = clamp(gameState.enemy.mp + 2, 0, gameState.enemy.maxMP);
+    updateBars();
+  }, 1000);
+}
 
-/* === Check end of round & apply rewards/penalties === */
+/* === Check End of Round === */
 function checkEnd(){
-  if(roundOver) return;
-  if(playerHP <= 0 || enemyHP <= 0){
-    roundOver = true;
-    clearInterval(aiInterval); clearInterval(regenInterval); aiActive = false;
+  if(gameState.roundOver) return;
+  if(gameState.player.hp <= 0 || gameState.enemy.hp <= 0){
+    gameState.roundOver = true;
+    clearInterval(aiInterval);
+    clearInterval(regenInterval);
+    aiActive = false;
 
-    if(enemyHP <= 0 && playerHP <= 0){
+    if(gameState.enemy.hp <= 0 && gameState.player.hp <= 0){
       showAlert('Double KO!');
       log('Double KO — no changes.');
-    }
-    else if(enemyHP <= 0){
-      // Player win
+    } else if(gameState.enemy.hp <= 0){
       showAlert('You Win!');
-      scores.player++; scores.score += 50;
-      // Random-ish token reward: 100..150
-      const reward = 100 + randInt(0, 50);
-      wallet.tokens += reward;
-      saveWallet();
-
-      // Increase enemy stats (persistent)
+      gameState.scores.player++;
+      gameState.scores.score += 50;
+      const reward = 100 + randInt(0,50);
+      gameState.wallet.tokens += reward;
       increaseEnemyStatsPerWin();
-
-      log(`🏆 You earned ${reward} tokens! Wallet: ${wallet.tokens} | Enemy IQ ${enemyIQ.toFixed(1)}, HP → ${enemyMaxHP}, MP → ${enemyMaxMP}`);
-    }
-    else {
-      // Enemy win
+      log(`🏆 You earned ${reward} tokens! Wallet: ${gameState.wallet.tokens}`);
+    } else {
       showAlert('You Lose!');
-      scores.enemy++;
-      scores.score = Math.max(0, scores.score - 30);
+      gameState.scores.enemy++;
+      gameState.scores.score = Math.max(0, gameState.scores.score - 30);
       log('You lost this round.');
     }
-
     updateScoreboard();
-    // new round after short delay
-    setTimeout(()=>{ roundOver = false; newRound(); }, 1200);
+    savePlayerData();
+    setTimeout(()=>{
+      gameState.roundOver = false;
+      newRound();
+    }, 1200);
   }
 }
 
-/* === New round / reset round (not entire reset) === */
+/* === Start New Round === */
 function newRound(){
-  playerHP = PLAYER_MAX_HP; playerMP = MAX_MP;
-  // enemy keeps scaled max HP/MP (persistent). Start round full.
-  enemyHP = enemyMaxHP; enemyMP = enemyMaxMP;
-
-  enemyDefending = playerDefending = false;
+  gameState.player.hp = PLAYER_MAX_HP;
+  gameState.player.mp = MAX_MP;
+  gameState.enemy.hp = gameState.enemy.maxHP;
+  gameState.enemy.mp = gameState.enemy.maxMP;
   aiActive = false;
-  updateBars(); updateScoreboard();
-  log('New round — AI waits for your move.');
-  startRegen();
-}
-
-/* === Full reset (reset scores, wallet kept if you want, but here we restore tokens) === */
-function resetGame(){
-  scores = { player: 0, enemy: 0, score: 0 };
-  wallet.tokens = 1000;
-  // Reset enemy scaling to base values if you want a full reset:
-  enemyIQ = 0;
-  enemyMaxHP = 200;
-  enemyMaxMP = 50;
-  enemyHP = enemyMaxHP;
-  enemyMP = enemyMaxMP;
-
-  saveWallet();
-  newRound();
-  updateScoreboard();
-  log('Game reset — Wallet restored to 1000 tokens and Enemy stats reset.');
-}
-
-/* === Start helper (keeps original startGame function available) === */
-function startGame(){
-  // If your UI toggles gameArea etc, keep behavior consistent with original
-  const gameArea = document.getElementById('gameArea');
-  const startBtn = document.getElementById('startBtn');
-  if(gameArea) gameArea.style.display = "block";
-  if(startBtn) startBtn.style.display = "none";
-  newRound();
-  showAlert("Welcome to the Arena ⚔!");
-  log("Game started. You move first!");
-  loadWallet();
-  loadUpgrades();
-}
-
-/* === Initialize on load === */
-window.addEventListener("DOMContentLoaded", () => {
   updateBars();
   updateScoreboard();
-  // startRegen optional - we can start regen once UI starts a round
+  log('New round — AI waits for your move.');
+  startRegen();
+  savePlayerData();
+}
+
+/* === Reset Game === */
+function resetGame(){
+  gameState.scores = { player:0, enemy:0, score:0 };
+  gameState.wallet.tokens = 1000;
+  gameState.enemy.iq = 0;
+  gameState.enemy.maxHP = 200;
+  gameState.enemy.maxMP = 50;
+  gameState.enemy.hp = 200;
+  gameState.enemy.mp = 50;
+  attackUpgrade = 0;
+  specialUpgrade = 0;
+  applyUpgrades();
+  savePlayerData();
+  newRound();
+  updateScoreboard();
+  log('Game reset — Wallet restored and enemy stats reset.');
+}
+
+/* === On Page Load === */
+window.addEventListener("DOMContentLoaded", () => {
+  loadPlayerData();
+  updateBars();
+  updateScoreboard();
+  startRegen();
 });
 </script>
+
 </body>
 </html>
