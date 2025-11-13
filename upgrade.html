@@ -3,11 +3,6 @@
 
 
 
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -70,62 +65,92 @@ body {
 <button onclick="goBackToGame()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-2xl shadow-lg transition-all mb-8">⬅ Back to Game</button>
 
 <script>
-// Wallet and Upgrade Data
-let wallet = JSON.parse(localStorage.getItem('rpgWallet')) || { tokens: 500 };
-let attackUpgrade = parseInt(localStorage.getItem('attackUpgrade')) || 0;
-let specialUpgrade = parseInt(localStorage.getItem('specialUpgrade')) || 0;
+const PLAYER_ID = "player123"; // must match RPG player ID
+const BASE_URL = "https://rpg-storage-server.onrender.com/players";
 
-// Save functions
-function saveWallet() { localStorage.setItem('rpgWallet', JSON.stringify(wallet)); }
-function saveUpgrades() {
-  localStorage.setItem('attackUpgrade', attackUpgrade);
-  localStorage.setItem('specialUpgrade', specialUpgrade);
+// Unified game state
+let gameState = {
+  wallet: { tokens: 500 },
+  attackUpgrade: 0,
+  specialUpgrade: 0
+};
+
+// Load player data from backend
+async function loadPlayerData() {
+  try {
+    const res = await fetch(`${BASE_URL}/${PLAYER_ID}`);
+    const data = await res.json();
+
+    gameState.wallet.tokens = data.tokens ?? 500;
+    gameState.attackUpgrade = data.attackUpgrade ?? 0;
+    gameState.specialUpgrade = data.specialUpgrade ?? 0;
+
+    updateUI();
+  } catch(err) {
+    console.error("Error loading player data:", err);
+  }
 }
 
-// Special cost: Level 1 = 500, doubles each level
+// Save player data to backend
+async function savePlayerData() {
+  try {
+    const payload = {
+      tokens: gameState.wallet.tokens,
+      attackUpgrade: gameState.attackUpgrade,
+      specialUpgrade: gameState.specialUpgrade
+    };
+    await fetch(`${BASE_URL}/${PLAYER_ID}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch(err) {
+    console.error("Error saving player data:", err);
+  }
+}
+
+// Special cost function
 function specialCost(level) {
-  if(level <= 0) return 500;
-  return 500 * Math.pow(2, level);
+  return level <= 0 ? 500 : 500 * Math.pow(2, level);
 }
 
 // Update UI
 function updateUI() {
-  document.getElementById('walletBalance').innerText = wallet.tokens;
+  document.getElementById('walletBalance').innerText = gameState.wallet.tokens;
 
   // Attack Upgrade
-  document.getElementById('attackLevel').innerText = attackUpgrade + '%';
-  document.getElementById('attackBar').style.width = attackUpgrade + '%';
-  document.getElementById('attackCost').innerText = Math.min((attackUpgrade/10 + 1)*200,2000);
+  document.getElementById('attackLevel').innerText = gameState.attackUpgrade + '%';
+  document.getElementById('attackBar').style.width = gameState.attackUpgrade + '%';
+  document.getElementById('attackCost').innerText = Math.min((gameState.attackUpgrade/10 + 1)*200,2000);
 
   // Special Power Upgrade
-  document.getElementById('specialLevel').innerText = specialUpgrade;
-  document.getElementById('specialBar').style.width = Math.min(specialUpgrade*10, 100) + '%';
-  document.getElementById('specialCost').innerText = specialCost(specialUpgrade);
-
-  // Glow intensity scales with level
+  document.getElementById('specialLevel').innerText = gameState.specialUpgrade;
+  document.getElementById('specialBar').style.width = Math.min(gameState.specialUpgrade*10, 100) + '%';
   const specialBar = document.getElementById('specialBar');
-  specialBar.style.boxShadow = `0 0 ${5 + specialUpgrade*2}px rgba(255,182,193,0.8), 0 0 ${10 + specialUpgrade*2}px rgba(255,105,180,0.6)`;
+  specialBar.style.boxShadow = `0 0 ${5 + gameState.specialUpgrade*2}px rgba(255,182,193,0.8), 0 0 ${10 + gameState.specialUpgrade*2}px rgba(255,105,180,0.6)`;
 }
 
 // Upgrade functions
-function buyAttackUpgrade() {
-  const cost = Math.min((attackUpgrade/10 + 1) * 200, 2000);
-  if(wallet.tokens >= cost && attackUpgrade < 100){
-    wallet.tokens -= cost;
-    attackUpgrade += 10;
-    if(attackUpgrade > 100) attackUpgrade = 100;
-    saveWallet(); saveUpgrades(); updateUI();
-    alert(`Attack upgraded to +${attackUpgrade}%`);
+async function buyAttackUpgrade() {
+  const cost = Math.min((gameState.attackUpgrade/10 + 1) * 200, 2000);
+  if(gameState.wallet.tokens >= cost && gameState.attackUpgrade < 100){
+    gameState.wallet.tokens -= cost;
+    gameState.attackUpgrade += 10;
+    if(gameState.attackUpgrade > 100) gameState.attackUpgrade = 100;
+    updateUI();
+    await savePlayerData();
+    alert(`Attack upgraded to +${gameState.attackUpgrade}%`);
   } else alert('Not enough tokens or max upgrade reached!');
 }
 
-function buySpecialUpgrade() {
-  const cost = specialCost(specialUpgrade);
-  if(wallet.tokens >= cost){
-    wallet.tokens -= cost;
-    specialUpgrade += 1;
-    saveWallet(); saveUpgrades(); updateUI();
-    alert(`Special Power upgraded to level ${specialUpgrade}`);
+async function buySpecialUpgrade() {
+  const cost = specialCost(gameState.specialUpgrade);
+  if(gameState.wallet.tokens >= cost){
+    gameState.wallet.tokens -= cost;
+    gameState.specialUpgrade += 1;
+    updateUI();
+    await savePlayerData();
+    alert(`Special Power upgraded to level ${gameState.specialUpgrade}`);
   } else alert('Not enough tokens!');
 }
 
@@ -134,7 +159,9 @@ function goBackToGame() {
   window.location.href = 'rpg.html';
 }
 
-window.addEventListener('DOMContentLoaded', updateUI);
+// Initialize page
+window.addEventListener('DOMContentLoaded', loadPlayerData);
 </script>
+
 </body>
-  </html>
+</html>
